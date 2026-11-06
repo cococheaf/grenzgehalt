@@ -16,7 +16,7 @@ import { buildPaymentPlans, selectedPayment, paymentDifference, comparisonSummar
 import { liFamilyEstimate, suggestedLocalPremium } from './planning.mjs';
 import { shareHash, readShareHash } from './share.mjs';
 
-const APP_VERSION='4.23.0';
+const APP_VERSION='4.24.0';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const form=$('#calculator-form'), result=$('#result-content');
 const integer=new Intl.NumberFormat('de-AT',{maximumFractionDigits:0});
@@ -348,17 +348,49 @@ function comparisonTimelinePrint(){const t=last.comparisonTimeline;return `<sect
 function timelinePrint(){const t=last.timeline;return `<section class="timeline-print"><h2>Jahresverlauf · verfügbare Monatsbeträge</h2><p class="print-note">${t.schedule}. Geplanter Zahlungszeitpunkt; Krankenversicherung, AT-Rücklage und Kosten enthalten. ${PAYDAY_NOTE}</p><table><thead><tr><th>Auszahlungsmonat</th><th>Bezüge</th><th>Verfügbar EUR · ca.</th></tr></thead><tbody>${t.months.map(m=>`<tr><td>${m.name}</td><td>${m.salaryCount}</td><td>${eur(m.available)}</td></tr>`).join('')}${t.unassigned.map(e=>`<tr><td>${e.label} · ohne Monatszuordnung</td><td>separat</td><td>${eur(e.available)}</td></tr>`).join('')}${Math.abs(t.adjustment?.available||0)>=.005?`<tr><td>${t.adjustment.label}</td><td>separat</td><td>${eur(t.adjustment.available)}</td></tr>`:''}<tr class="total"><td>Jahresbudget gesamt</td><td></td><td>${eur(t.annualAvailable)}</td></tr></tbody></table></section>`;}
 function paydayBreakdown(key,month){
  const country=key==='foreign'?rawState().calculatorCountry:key,job=last.byCountry[country],m=job.timeline.months[month],at=country==='at';
- const health=job.inputs.raw.healthType==='private'?'Private Grundversicherung':'ÖGK-Selbstversicherung';
- const rows=at?[['Brutto',m.salaryGross],['Sozialversicherung',-m.social],['Lohnsteuer',-m.tax],['Arbeitgeberauszahlung',m.payout]]:[['Arbeitgeberauszahlung in EUR',m.payout],['Steuerrücklage Österreich',-m.reserve],[health,-m.health]];
- return `<h3>${countryName(country)} · ${m.name}</h3>${!at?`<table><tbody>${[['Bruttogehalt',m.grossCHF],['Sozialversicherung & PK',-m.socialCHF],['Quellensteuer',-m.sourceCHF],...(country==='li'?[['Arbeitgeber-KK-Beitrag',m.subsidyCHF]]:[]),['Auszahlung in CHF',m.payoutCHF]].map(([label,value])=>`<tr><td>${label}</td><td>${chf(value)}</td></tr>`).join('')}</tbody></table><p class="field-help">${chf(m.payoutCHF)} × ${job.inputs.li.fx.toLocaleString('de-AT',{maximumFractionDigits:8})} = ${eur(m.payout)}. CHF-Auszahlungen gemeinsam und erst zum Schluss umgerechnet.</p>`:''}<table><tbody>${[...rows,...(m.supplement?[['Private Zusatzversicherung',-m.supplement]]:[]),['Eigene laufende Kosten',-m.extraCosts],['Verfügbar',m.available]].map(([label,value],i,all)=>periodRow(label,value,i===all.length-1?'total':'')).join('')}</tbody></table>`;
+ const insurance=job.inputs.raw.healthType;
+ const health=job.result.resident||insurance==='local'
+  ? country==='ch'?'Schweizer KVG-Grundversicherung':'Liechtensteinische OKP'
+  : insurance==='private'?'Private Grundversicherung':'ÖGK-Selbstversicherung';
+ const rows=at
+  ? [['Brutto',m.salaryGross],['Sozialversicherung',-m.social],['Lohnsteuer',-m.tax],['Arbeitgeberauszahlung',m.payout]]
+  : [['Arbeitgeberauszahlung in EUR',m.payout],
+    ...(!job.result.resident&&!job.result.publicLI?[['Steuerrücklage Österreich',-m.reserve]]:[]),
+    ...(m.localTax?[['Schweizer Steuerrücklage',-m.localTax]]:[]),
+    [health,-m.health]];
+ const cashRows=[...rows,
+  ...(m.supplement?[['Private Zusatzversicherung',-m.supplement]]:[]),
+  ...(m.parking?[['Parkplatzkosten',-m.parking]]:[]),
+  ...(m.familyCash?[['Familienzulage / Differenzausgleich',m.familyCash]]:[]),
+  ['Eigene laufende Kosten',-m.extraCosts],['Verfügbar',m.available]];
+ return `<h3>${countryName(country)} · ${m.name}</h3>${!at?`<table><tbody>${[['Bruttogehalt',m.grossCHF],['Sozialversicherung & PK',-m.socialCHF],[job.result.publicLI?'LI-Steuer · Art. 19':'Quellensteuer',-m.sourceCHF],...(country==='li'?[['Arbeitgeber-KK-Beitrag',m.subsidyCHF]]:[]),['Auszahlung in CHF',m.payoutCHF]].map(([label,value])=>`<tr><td>${label}</td><td>${chf(value)}</td></tr>`).join('')}</tbody></table><p class="field-help">${chf(m.payoutCHF)} × ${job.inputs.li.fx.toLocaleString('de-AT',{maximumFractionDigits:8})} = ${eur(m.payout)}. CHF-Auszahlungen werden gemeinsam und erst zum Schluss umgerechnet.</p>`:''}<table><tbody>${cashRows.map(([label,value],i)=>periodRow(label,value,i===cashRows.length-1?'total':'')).join('')}</tbody></table>`;
 }
 function renderAustrianCalculator(){
  const v=last.plans.at.regular,annual=last.plans.at.annual;
  return `<section class="net-card" aria-label="Geschätztes Netto"><p class="net-structure">Österreich · 14 Bruttogehälter pro Jahr</p><p class="net-label">Verfügbar im normalen Monat</p><div class="net-main" aria-live="polite"><span class="approx">ca.</span> ${eur(v.available)}</div><p class="net-sub">Nach Sozialversicherung inklusive ÖGK, Lohnsteuer und deinen Kosten. 13. und 14. Gehalt separat im Jahresverlauf.</p><div class="net-bottom"><div><span>Jahresbudget inkl. 13. und 14. Gehalt</span><strong>ca. ${eur(annual.available)}</strong></div><div><span>Lohnsteuer / Monat</span><strong>${eur(v.tax)}</strong></div></div></section>${renderSalaryTimeline()}<p class="plan-note">${example?'Fiktive Beispielwerte. ':''}Steuerjahr 2026 · österreichische Berechnung gegen 45 AK-Referenzfälle geprüft. <button class="text-button" data-view="method">Annahmen & Quellen ↗</button></p><div class="compare-invite"><div><h3>Ein weiteres Gehaltsangebot?</h3><p>Beide verfügbaren Budgets und alle Zahltage vergleichen.</p></div><button class="button button-primary" data-view="compare">Gehälter vergleichen ↗</button></div><details class="result-details annual-details"><summary>Jahresbudget aufschlüsseln<span aria-hidden="true">+</span></summary><div class="details-body">${annualBudgetBreakdown()}</div></details>${atDetail()}`;
 }
 function renderCalculator(){
- const country=rawState().calculatorCountry,job=last.byCountry[country],v=job.plan.regular,annual=job.plan.annual;
- return `<div class="overview-stack">${currencyControl()}<section class="net-card" aria-label="Verfügbares Budget"><p class="net-structure">${countryName(country)} · ${job.timeline.payments} Gehälter</p><p class="net-label">Verfügbar im normalen Monat</p><div class="net-main" aria-live="polite"><span class="approx">ca.</span> ${displayBudget(v.available)}</div><p class="net-sub">Nach Abgaben, Versicherung und deinen Kosten.</p><div class="net-bottom"><div><span>Verfügbar im Jahr · alle Bezüge</span><strong>${displayBudget(annual.available)}</strong></div>${country!=='at'&&!job.result.resident&&!job.result.publicLI?`<div><span>AT-Steuerrücklage / Monat</span><strong>${eur(v.reserve)}</strong></div>`:''}</div></section><p class="overview-status">${example?'Beispielrechnung · ':''}Planungswerte 2026 · Sonderzahlungen sind im Jahresbudget enthalten.</p>${renderSalaryTimeline()}${planningResults()}<div class="overview-sections">${yearOverview()}${calculationOverview()}</div><div class="overview-action"><p>Ein weiteres Angebot vergleichen?</p><button class="button button-primary" data-view="compare">Zum Gehaltsvergleich ↗</button></div></div>`;
+ const country=rawState().calculatorCountry,job=last.byCountry[country],month=job.plan.regular,year=job.plan.annual;
+ const reserve=country!=='at'&&!job.result.resident&&!job.result.publicLI
+  ? `<div><dt>AT-Steuerrücklage im Monat</dt><dd>${eur(month.reserve)}</dd></div>`
+  : '';
+ return `<div class="overview-stack">
+  <section class="budget-sheet" aria-label="Verfügbares Budget">
+   <div class="budget-sheet-top"><span class="sheet-code">${countryCode(country)} / ${countryName(country)}</span>${currencyControl()}</div>
+   <div class="budget-sheet-body">
+    <div><p class="sheet-kicker">REGULÄRER MONATSBEZUG</p><p class="net-main" aria-live="polite">${displayBudget(month.available)}</p>
+     <p class="sheet-note">${example?'Fiktive Beispielrechnung. ':''}Nach Abgaben, Versicherung und eigenen Kosten.</p></div>
+    <dl class="sheet-metrics">
+     <div><dt>Jahr mit ${job.timeline.payments} Gehältern</dt><dd>${displayBudget(year.available)}</dd></div>
+     ${reserve}
+    </dl>
+   </div>
+  </section>
+  ${renderSalaryTimeline()}
+  <div class="overview-sections">${yearOverview()}${calculationOverview()}</div>
+  ${planningResults()}
+  <div class="overview-action"><p>Wie schneidet ein zweites Angebot ab?</p><button class="button button-primary" data-view="compare">Angebote gegenüberstellen <span aria-hidden="true">→</span></button></div>
+ </div>`;
 }
 function compareHeaders(){return `<tr><th>Position</th><th>${foreignName()} · CHF<br>${foreignPeriod().column}</th><th>Österreich · EUR<br>${atDisplayPeriod().column}</th></tr>`;}
 function nativeComparisonLines(f=payment('foreign'),a=payment('at')){return [['Bruttogehalt',f.grossCHF,a.salaryGross],...(last.li.kind==='li'?[['Arbeitgeber-KK-Beitrag',f.subsidyCHF,0]]:[]),['Sozialversicherung & PK',-f.socialCHF,-a.social],[`Quellensteuer ${foreignCode()} / Lohnsteuer AT`,-f.sourceCHF,-a.tax],['Auszahlung vom Arbeitgeber',f.payoutCHF,a.payout]];}
@@ -390,12 +422,12 @@ function thirdCountryPanel(){
  const table=entry?`<div class="table-scroll"><table><thead><tr><th scope="col">Budget</th>${reportCountries().map(key=>`<th scope="col">${countryName(key)}</th>`).join('')}</tr></thead><tbody>
   ${[['Normaler Monat','regular'],['Durchschnitt je Kalendermonat','average'],['Jahr gesamt','annual']].map(([label,period])=>`<tr><th scope="row">${label}</th>${reportCountries().map(key=>{const plan=last.byCountry[key].plan;return `<td>${displayBudget(period==='average'?plan.annual.available/12:plan[period].available)}</td>`;}).join('')}</tr>`).join('')}
   </tbody></table></div>`:'';
- return `<section class="section-card planning-result"><h3>Drei Länder nebeneinander</h3>
-  <label class="check-label"><input type="checkbox" id="compare-three" ${threeWay?'checked':''}> ${countryName(country)} als drittes Land hinzufügen</label>
+ return `<details class="result-details planning-result" data-section="third-offer"><summary>Zusätzliches Länderprofil <span aria-hidden="true">+</span></summary><div class="details-body">
+  <label class="check-label"><input type="checkbox" id="compare-three" ${threeWay?'checked':''}> ${countryName(country)} in die Gegenüberstellung aufnehmen</label>
   ${threeWay?`${country!=='at'?`<label class="check-label"><input type="checkbox" id="compare-same" ${sameGross?'checked':''}> Gleiches CHF-Vertragsbrutto als Szenario verwenden</label>`:''}
   ${sameGross&&country!=='at'?'<p class="table-note">Für das zusätzliche Land gelten Standardannahmen. Beim Schweizer Szenario wird der Kanton aus dem Schweizer Profil übernommen.</p>':''}
   ${last.thirdError?`<p class="table-note" role="status">${esc(last.thirdError)}</p>`:''}${table}
-  <button class="text-button" type="button" data-edit-comparison="${country}">Angaben für ${countryName(country)} bearbeiten ↗</button>`:''}</section>`;
+  <button class="text-button" type="button" data-edit-comparison="${country}">Angaben für ${countryName(country)} bearbeiten ↗</button>`:''}</div></details>`;
 }
 function fxScenarioPanel(jobs){
  const foreign=jobs.filter(job=>job.country!=='at');
@@ -419,7 +451,7 @@ function fxScenarioPanel(jobs){
   const relevant=baseline===-1?-1:jobs.findIndex(job=>job.country!=='at');
   return `<tr><th scope="row">${label}<small>1 CHF = ${rate.toLocaleString('de-AT',{minimumFractionDigits:4,maximumFractionDigits:4})} EUR</small></th>${values.map(value=>`<td>${value===null?'—':eur(value)}</td>`).join('')}${relevant<0?'':`<td>${values[relevant]===null?'—':eur(values[relevant]-values[baseline])}</td>`}</tr>`;
  });
- return `<details class="result-details planning-result"><summary>Wie ändert der Wechselkurs das Jahresbudget?<span aria-hidden="true">+</span></summary><div class="details-body"><div class="table-scroll"><table><thead><tr><th scope="col">Kurs</th>${jobs.map(job=>`<th scope="col">${countryName(job.country)} · EUR/Jahr</th>`).join('')}${jobs.some(job=>job.country==='at')?`<th scope="col">${countryCode(foreign[0].country)} − AT</th>`:''}</tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="table-note">Bei jedem Kurs werden Umrechnung und österreichische Steuer neu berechnet. Die Gehaltsangaben bleiben gleich.</p></div></details>`;
+ return `<details class="result-details planning-result"><summary>Währungspuffer bei ±5 %<span aria-hidden="true">+</span></summary><div class="details-body"><div class="table-scroll"><table><thead><tr><th scope="col">CHF-Kurs</th>${jobs.map(job=>`<th scope="col">${countryName(job.country)} · EUR/Jahr</th>`).join('')}${jobs.some(job=>job.country==='at')?`<th scope="col">${countryCode(foreign[0].country)} − AT</th>`:''}</tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="table-note">Für jeden Kurs wird das Jahresbudget einschließlich einer etwaigen österreichischen Steuer neu berechnet.</p></div></details>`;
 }
 function planningResults(){
  const jobs=reportCountries().map(country=>last.byCountry[country]);
@@ -431,11 +463,41 @@ function planningResults(){
   const price=job.result.resident&&factor!==1?`<small>Nach Preisniveau ${esc(String(job.inputs.raw.chPriceFactor))}: ${displayBudget(annual.available/factor/12)} je Kalendermonat.</small>`:'';
   return `<li><strong>${countryName(job.country)}</strong><span>${pct.toLocaleString('de-AT',{style:'percent',maximumFractionDigits:1})} Abgaben inkl. Grundversicherung · davon ${tax.toLocaleString('de-AT',{style:'percent',maximumFractionDigits:1})} Steuern</span><small>Jahresbudget ÷ 12: ${displayBudget(annual.available/12)} je Kalendermonat.</small>${price}</li>`;
  });
- return `${view==='compare'?thirdCountryPanel():''}${fxScenarioPanel(jobs)}<details class="result-details planning-result"><summary>Abgabenquote &amp; Monatsdurchschnitt<span aria-hidden="true">+</span></summary><div class="details-body"><ul class="budget-indicators">${rates.join('')}</ul><p class="table-note">Die Quote setzt Sozialabgaben, Grundversicherung und Steuern ins Verhältnis zum modellierten Brutto. Persönliche Kosten zählen zur Budgetrechnung, aber nicht zur Abgabenquote.</p></div></details>`;
+ return `<section class="scenario-board section-card"><div class="section-heading"><div><p class="section-kicker">PLANUNG</p><h2>Budget unter der Lupe</h2></div></div>
+  ${fxScenarioPanel(jobs)}
+  <details class="result-details planning-result"><summary>Abgaben und Jahresdurchschnitt<span aria-hidden="true">+</span></summary><div class="details-body"><ul class="budget-indicators">${rates.join('')}</ul><p class="table-note">Für die Abgabenquote werden Sozialabgaben, Grundversicherung und Steuern durch das modellierte Brutto geteilt.</p></div></details>
+ </section>`;
 }
 function renderCompare(){
- const c=pairSummary(last.byCountry[countryOrder()[0]],last.byCountry[countryOrder()[1]],comparisonPeriod),values=c.values,order=countryOrder(),monthly=comparisonPeriod==='monthly',unit=monthly?'im normalen Monat':'im Jahr',diff=c.difference,winner=countryName(diff>=0?order[0]:order[1]);
- return `<div class="overview-stack"><div class="comparison-toolbar"><h2>Verfügbares Budget</h2>${currencyControl()}<fieldset class="salary-period comparison-period"><legend>Zeitraum für beide Gehälter</legend><label><input type="radio" name="comparisonPeriod" value="monthly" ${monthly?'checked':''}><span>Normaler Monat</span></label><label><input type="radio" name="comparisonPeriod" value="annual" ${monthly?'':'checked'}><span>Jahr gesamt</span></label></fieldset></div><div class="compare-cards">${order.map(key=>`<section class="comparison-card" aria-label="Ergebnis ${countryName(key)}"><div class="comparison-head"><span class="country-code">${countryCode(key)}</span><h2>${countryName(key)}</h2></div><p class="compare-period">Verfügbar ${unit}</p><div class="compare-amount"><span class="approx">ca.</span> ${displayBudget(values[key])}</div></section>`).join('')}</div><section class="comparison-difference" aria-label="Gehaltsunterschied"><p>${Math.abs(diff)<.005?'Beide Budgets sind gleich hoch.':`${winner==='Schweiz'?'In der Schweiz':'In '+winner} bleiben dir ${unit}`}</p><strong>${displayBudget(Math.abs(diff))}${Math.abs(diff)<.005?'':' mehr'}</strong></section><p class="overview-status">Nach Abgaben, Versicherung und deinen Kosten. ${example?'Beispielrechnung · ':''}Planungswerte 2026.</p>${renderComparisonTimeline()}${planningResults()}<div class="overview-sections">${yearOverview()}${calculationOverview()}</div></div>`;
+ const order=countryOrder(),monthly=comparisonPeriod==='monthly';
+ const difference=pairSummary(last.byCountry[order[0]],last.byCountry[order[1]],comparisonPeriod).difference;
+ const entries=reportCountries().map(key=>({
+  key,
+  amount:last.byCountry[key].plan[monthly?'regular':'annual'].available,
+ }));
+ const largest=Math.max(1,...entries.map(entry=>Math.abs(entry.amount)));
+ return `<div class="overview-stack">
+  <section class="budget-sheet comparison-sheet" aria-label="Budgetvergleich">
+   <div class="budget-sheet-top"><span class="sheet-code">ANGEBOTE / VERFÜGBARES BUDGET</span>${currencyControl()}</div>
+   <fieldset class="salary-period comparison-period"><legend>Zeitraum im Budgetvergleich</legend>
+    <label><input type="radio" name="comparisonPeriod" value="monthly" ${monthly?'checked':''}><span>Normaler Monat</span></label>
+    <label><input type="radio" name="comparisonPeriod" value="annual" ${monthly?'':'checked'}><span>Jahr gesamt</span></label>
+   </fieldset>
+   <ul class="budget-lanes">
+    ${entries.map(({key,amount},index)=>`<li class="budget-lane lane-${index}${amount<0?' lane-negative':''}">
+     <span class="lane-name"><span class="station-code" aria-hidden="true">${countryCode(key)}</span>${countryName(key)}</span>
+     <span class="lane-track" aria-hidden="true"><span style="--share:${Math.abs(amount)/largest*100}%"></span></span>
+     <strong>${displayBudget(amount)}</strong>
+    </li>`).join('')}
+   </ul>
+   <div class="sheet-difference"><span>Abstand der Hauptangebote <small>${countryCode(order[0])} − ${countryCode(order[1])}</small></span><strong>${difference>0?'+':''}${displayBudget(difference)}</strong></div>
+   <p class="sheet-note">${example?'Fiktive Beispielrechnung. ':''}Alle Beträge nach Abgaben, Versicherung und eigenen Kosten.</p>
+  </section>
+  ${thirdCountryPanel()}
+  ${renderComparisonTimeline()}
+  <div class="overview-sections">${yearOverview()}${calculationOverview()}</div>
+  ${planningResults()}
+ </div>`;
 }
 function inputSummary(){
  const rows=[['Rechnerland',primaryName()],...(view==='compare'?[['Vergleichsland',countryName(rawState().comparisonCountry)]]:[]),['Steuerjahr','2026'],['Anzeige','Normaler Monat; zusätzliche Gehälter separat']];
@@ -470,6 +532,18 @@ function renderResult(html){
  syncDisclosureIcons(result);
 }
 
+function syncHeroBudget(){
+ const key=rawState().calculatorCountry;
+ const job=last?.byCountry[key];
+ const annual=view==='compare'&&comparisonPeriod==='annual';
+ const amount=job?.plan[annual?'annual':'regular'].available;
+ $('#hero-readout-label').textContent=annual?'JAHR GESAMT':'NORMALER MONAT';
+ $('#hero-budget').textContent=amount===undefined?'—':displayBudget(amount);
+ $('#hero-budget-note').textContent=job
+  ? countryName(key)+(example?' · Beispielrechnung':' · nach Abgaben und Kosten')
+  : 'Sobald alle Angaben vorliegen';
+}
+
 function update(){syncCountryUi();syncExactMode();syncInputOptions();try{
  saveEditor();const raw=rawState(),countries=view==='compare'?countryOrder():[raw.calculatorCountry],jobs={};
  for(const country of countries){
@@ -500,17 +574,23 @@ function update(){syncCountryUi();syncExactMode();syncInputOptions();try{
  }
  last={...jobContext(main),byCountry:jobs,thirdError,comparisonTimeline:view==='compare'?buildCountryComparison(main,jobs[raw.comparisonCountry]):null};
  $('#monthly-preview').textContent=edit&&edit.country!=='at'?eur(edit.plan.regular.available):'—';$('#at-monthly-preview').textContent=edit?.country==='at'?eur(edit.plan.regular.available):'—';$('#validation').hidden=true;$('#validation').textContent='';result.classList.remove('stale-results');renderResult(view==='compare'?renderCompare():renderCalculator());updatePrint();persist();
-}catch(error){last=null;$('#monthly-preview').textContent='Angaben ergänzen';$('#at-monthly-preview').textContent='Angaben ergänzen';$('#validation').textContent=error.message;$('#validation').hidden=false;result.classList.remove('stale-results');result.innerHTML='<div class="results-empty"><h2>Ergänze deine Angaben.</h2><p>Nach der Korrektur wird das Budget automatisch neu berechnet.</p></div>';updatePrint();}}
+}catch(error){last=null;$('#monthly-preview').textContent='Angaben ergänzen';$('#at-monthly-preview').textContent='Angaben ergänzen';$('#validation').textContent=error.message;$('#validation').hidden=false;result.classList.remove('stale-results');result.innerHTML='<div class="results-empty"><h2>Ergänze deine Angaben.</h2><p>Nach der Korrektur wird das Budget automatisch neu berechnet.</p></div>';updatePrint();}
+ finally{syncHeroBudget();}
+}
 
 function changeView(next,scroll=false){
   saveEditor();
   view=['calculator','compare','method','help'].includes(next)?next:'calculator';
+  const workbench=view==='calculator'||view==='compare';
   $$('nav [data-view]').forEach(el=>{el.classList.toggle('active',el.dataset.view===view);if(el.dataset.view===view)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
   $('#workspace').hidden=['method','help'].includes(view);$('#method-view').hidden=view!=='method';$('#help-view').hidden=view!=='help';$('.export-wrap').hidden=view==='help';$('#workspace').classList.toggle('is-comparison',view==='compare');
   $('.country-picker').hidden=view==='method';$('#example-button').hidden=view!=='calculator';$('#guide-open').hidden=!['calculator','compare'].includes(view);
+  $('#hero-readout').hidden=!workbench;
+  $('.workbench-hero').classList.toggle('is-reference',!workbench);
+  $('#workbench-tools').hidden=!workbench;
   switchEditor(editorCountry());syncInputVisibility();
-  $('#page-title').innerHTML=view==='compare'?'Zwei Gehälter. <span>Ein Vergleich.</span>':view==='method'?'Gut zu wissen. <span>Offen erklärt.</span>':view==='help'?'Einfach starten. <span>Klar verstehen.</span>':'Was bleibt <span>für dich?</span>';
-  $('#page-subtitle').textContent=view==='compare'?'Dein fertiges Budget und das Vergleichsgehalt. Alle Zahltage auf derselben Basis.':view==='method'?'Die gesetzlichen Werte, unsere Pauschalen und die Grenzen der Näherungsrechnung.':view==='help'?'So findest du dein verfügbares Budget und vergleichst deine Angebote.':'Österreich, Liechtenstein oder Schweiz. Dein Gehalt mit allen Abzügen und Zahltagen.';
+  $('#page-title').innerHTML=view==='compare'?'Angebote <span>im Budgetcheck.</span>':view==='method'?'Die Regeln <span>hinter den Zahlen.</span>':view==='help'?'Hilfe für <span>deine Rechnung.</span>':'Dein Gehalt.<br><span>Dein Spielraum.</span>';
+  $('#page-subtitle').textContent=view==='compare'?'Stell deine Angebote nach Abgaben und Kosten gegenüber und prüfe, wann dir das Geld zur Verfügung steht.':view==='method'?'Hier findest du die amtlichen Quellen, die angesetzten Werte und die Annahmen des Rechners.':view==='help'?'Von der Bruttoeingabe zum Monatsbudget, zum Angebotsvergleich und zum Export.':'Schätze dein verfügbares Budget nach Steuern, Versicherung und eigenen Kosten.';
   restoreInputOptions();history.replaceState(null,'',view==='calculator'?location.pathname:`#${view}`);update();syncDisclosureIcons();if(scroll)window.scrollTo({top:0,behavior:'smooth'});
 }
 function exportFilename(extension,full=reportDetail==='detailed'){
@@ -746,49 +826,43 @@ $('#share-confirm').addEventListener('click',async()=>{
 
 const guideDialog=$('#guide-dialog');
 const guideForm=$('#guide-form');
-const guideProgress=$('#guide-progress');
-let guideStep=0,guide;
+let guide;
 const options=(entries,value)=>entries.map(([key,label])=>`<option value="${esc(key)}" ${key===value?'selected':''}>${esc(label)}</option>`).join('');
 const countryOptions=except=>Object.keys(WORK_COUNTRIES).filter(key=>key!==except).map(key=>[key,countryName(key)]);
 function guideSalary(name,country){
  const at=country==='at';
  const data=guide.salaries[country];
- return `<div class="field"><label for="guide-${name}-gross">Brutto in ${countryName(country)}</label>
+ return `<div class="field"><label for="guide-${name}-gross">Bruttogehalt</label>
   <div class="input-affix"><input id="guide-${name}-gross" name="${name}Gross" value="${esc(data.gross)}" inputmode="decimal" autocomplete="off" required><span>${at?'EUR':'CHF'}</span></div></div>
   <div class="field-grid"><div class="field"><label for="guide-${name}-period">Zeitraum</label><select id="guide-${name}-period" name="${name}Period">${options([['monthly','Monatlich'],['annual','Jährlich']],data.period)}</select></div>
   <div class="field"><label for="guide-${name}-payments">Gehälter im Jahr</label><select id="guide-${name}-payments" name="${name}Payments">${options((at?['14','12']:['12','13','14']).map(value=>[value,value]),data.payments)}</select></div></div>`;
 }
 function renderGuide(){
- guideProgress.textContent=`Schritt ${guideStep+1} von 3`;
- $('#guide-back').hidden=guideStep===0;
- $('#guide-next').textContent=guideStep===2?'Ergebnis ansehen':'Weiter';
- let content='';
- if(guideStep===0){
-  content=`<div class="field"><label for="guide-country">Wo arbeitest du?</label><select id="guide-country" name="country">${options(countryOptions(),guide.country)}</select></div>`;
- }else if(guideStep===1){
-  content=guideSalary('main',guide.country);
-  if(guide.country==='ch')content+=`<div class="field-grid"><div class="field"><label for="guide-residence">Wohnsitz</label><select id="guide-residence" name="residence">${options([['at','Österreich'],['ch','Schweiz']],guide.residence)}</select></div><div class="field"><label for="guide-canton">Arbeits- oder Wohnkanton</label><select id="guide-canton" name="canton">${options(Object.entries(CANTONS),guide.canton)}</select></div></div>`;
- }else{
-  content=`<div class="field"><label for="guide-compare">Zweites Angebot</label><select id="guide-compare" name="compare">${options([['','Nur dieses Gehalt berechnen'],...countryOptions(guide.country)],guide.compare)}</select></div>${guide.compare?guideSalary('other',guide.compare):''}<p class="field-help">Versicherung, Lohnzetteldaten und weitere Angaben kannst du anschließend im Rechner ergänzen.</p>`;
- }
- $('#guide-step').innerHTML=content;
- $('#guide-step').querySelector('input,select')?.focus();
+ const swissDetails=`<div class="field-grid"><div class="field"><label for="guide-residence">Wohnsitz</label><select id="guide-residence" name="residence">${options([['at','Österreich'],['ch','Schweiz']],guide.residence)}</select></div><div class="field"><label for="guide-canton">Arbeits- oder Wohnkanton</label><select id="guide-canton" name="canton">${options(Object.entries(CANTONS),guide.canton)}</select></div></div>`;
+ $('#guide-step').innerHTML=`
+  <fieldset class="offer-column">
+   <legend>Dein Hauptangebot</legend>
+   <div class="field"><label for="guide-country">Arbeitsort</label><select id="guide-country" name="country">${options(countryOptions(),guide.country)}</select></div>
+   ${guideSalary('main',guide.country)}
+   ${guide.country==='ch'?swissDetails:''}
+  </fieldset>
+  <fieldset class="offer-column">
+   <legend>Zweites Angebot <small>optional</small></legend>
+   <div class="field"><label for="guide-compare">Vergleichsort</label><select id="guide-compare" name="compare">${options([['','Kein zweites Angebot'],...countryOptions(guide.country)],guide.compare)}</select></div>
+   ${guide.compare?guideSalary('other',guide.compare):'<p class="field-help">Wähle einen Arbeitsort, wenn du zwei Angebote gegenüberstellen möchtest.</p>'}
+   ${guide.compare==='ch'?swissDetails:''}
+  </fieldset>`;
 }
-function saveGuideStep(){
+function saveGuideInputs(){
  const elements=guideForm.elements;
- if(guideStep===0){
-  guide.country=elements.country.value;
-  if(guide.compare===guide.country)guide.compare='';
- }else{
-  const main=guideStep===1;
-  const prefix=main?'main':'other',country=main?guide.country:guide.compare;
+ for(const [prefix,country] of [['main',guide.country],['other',guide.compare]]){
   if(country&&elements[prefix+'Gross']){
    guide.salaries[country]={gross:elements[prefix+'Gross'].value,period:elements[prefix+'Period'].value,payments:elements[prefix+'Payments'].value};
   }
-  if(main&&guide.country==='ch'){
-   guide.residence=elements.residence.value;
-   guide.canton=elements.canton.value;
-  }
+ }
+ if(elements.residence){
+  guide.residence=elements.residence.value;
+  guide.canton=elements.canton.value;
  }
 }
 function applyGuide(){
@@ -798,7 +872,7 @@ function applyGuide(){
   if(country==='at')Object.assign(state,{atGross:data.gross,atPeriod:data.period,atPayments:data.payments});
   else profiles[country]={
    ...(profiles[country]||profileFrom(defaults)),liAnnual:data.gross,foreignPeriod:data.period,liPayments:data.payments,
-   ...(country==='ch'&&guide.country==='ch'?{chResidence:guide.residence,chCanton:guide.canton}:{}),
+   ...(country==='ch'?{chResidence:guide.residence,chCanton:guide.canton}:{}),
   };
  }
  const foreign=guide.country==='at'?(guide.compare||raw.foreignCountry):guide.country;
@@ -818,30 +892,31 @@ $('#guide-open').addEventListener('click',()=>{
    :{gross:state.liAnnual,period:state.foreignPeriod,payments:state.liPayments}];
  }));
  guide={country:raw.calculatorCountry,compare:view==='compare'?raw.comparisonCountry:'',residence:swiss.chResidence,canton:swiss.chCanton,salaries};
- guideStep=0;
- guideDialog.showModal();
  renderGuide();
+ guideDialog.showModal();
+ $('#guide-main-gross').focus();
 });
 $('#guide-close').addEventListener('click',()=>guideDialog.close());
-$('#guide-back').addEventListener('click',()=>{saveGuideStep();guideStep--;renderGuide();});
 guideForm.addEventListener('change',event=>{
- if(event.target.name!=='compare')return;
- saveGuideStep();
- guide.compare=event.target.value;
+ const {name,value,id}=event.target;
+ if(name!=='country'&&name!=='compare')return;
+ saveGuideInputs();
+ guide[name]=value;
+ if(guide.compare===guide.country)guide.compare='';
  renderGuide();
+ document.getElementById(id).focus();
 });
 guideForm.addEventListener('submit',event=>{
  event.preventDefault();
- const gross=$('#guide-step input');
- if(gross&&!(parseNumber(gross.value)>0)){
+ for(const gross of $$('#guide-step input')){
+  if(parseNumber(gross.value)>0)continue;
   gross.setCustomValidity('Bitte ein positives Bruttogehalt eingeben.');
   gross.reportValidity();
   gross.addEventListener('input',()=>gross.setCustomValidity(''),{once:true});
   return;
  }
- saveGuideStep();
- if(guideStep<2){guideStep++;renderGuide();}
- else applyGuide();
+ saveGuideInputs();
+ applyGuide();
 });
 
 result.addEventListener('change',event=>{

@@ -24,7 +24,7 @@ Danach [http://127.0.0.1:4173/](http://127.0.0.1:4173/) öffnen. `npm run tariff
 
 ## Aufbau und Modell
 
-- `dist/index.html` und `dist/assets/app.mjs`: Oberfläche, geführter Einstieg und Vergleich.
+- `dist/index.html` und `dist/assets/app.mjs`: Oberfläche, Angebotsblatt und Vergleich.
 - `calculator.mjs`, `scenario.mjs`, `payroll.mjs`, `planning.mjs`: Rechenregeln und Eingabevalidierung.
 - `payment-plan.mjs`, `salary-timeline.mjs`, `reporting.mjs`: Monatsbeträge, Sonderzahlungen und Ausgabe.
 - `dist/impressum.html` und `dist/datenschutz.html`: Rechtliche Seiten. Betreiberangaben werden aus einer lokalen, nicht versionierten Datei `dist/assets/site-contact.mjs` geladen. Für die eigene Installation kann sie ein Array `operator` mit je einer Textzeile pro Eintrag exportieren. Datenschutztexte und gegebenenfalls die PayPal-Empfängerkennung für die eigene Installation anpassen.
