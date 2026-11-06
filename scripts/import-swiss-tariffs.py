@@ -3,13 +3,17 @@ The input is a public dataset, not executable code. No filesystem extraction.
 """
 from pathlib import Path
 import base64,collections,gzip,hashlib,json,re,zipfile
-from urllib.request import urlopen
+from urllib.request import Request,urlopen
 root=Path(__file__).resolve().parents[1]
 source=root/'docs/swiss/tariffs-2026-source.zip'
 manifest=root/'docs/swiss/source.json'
 metadata=json.loads(manifest.read_text())
 if not source.exists():
- with urlopen(metadata['source'],timeout=60) as response: data=response.read(25_000_001)
+ request=Request(metadata['source'],headers={
+  'User-Agent':'Grenzgehalt/4.23 (https://github.com/cococheaf/grenzgehalt)',
+  'Referer':'https://www.estv.admin.ch/de/quellensteuertarife-import-in-lohnbuchhaltungssysteme',
+ })
+ with urlopen(request,timeout=60) as response: data=response.read(25_000_001)
  if hashlib.sha256(data).hexdigest()!=metadata['sha256']: raise SystemExit('ESTV-Download weicht von der geprüften SHA256-Prüfsumme ab.')
  source.write_bytes(data)
 if hashlib.sha256(source.read_bytes()).hexdigest()!=metadata['sha256']: raise SystemExit('Lokale ESTV-Datei weicht von der geprüften SHA256-Prüfsumme ab.')
