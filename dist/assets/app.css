@@ -356,9 +356,14 @@ summary{display:flex;align-items:center;justify-content:space-between;gap:15px;c
 .planning-result th small,.budget-indicators small{display:block;color:var(--muted);font-weight:normal}
 .budget-indicators{margin:0;padding:0;list-style:none;display:grid;gap:.8rem}
 .budget-indicators li{display:grid;gap:.15rem}
-.formula-hint{display:inline-block;margin-left:.35rem;vertical-align:baseline}
-.formula-hint[open]{display:block;margin:.4rem 0 0}
-.formula-hint summary{display:inline-grid;place-items:center;width:1.2em;height:1.2em;border:1px solid currentColor;border-radius:50%;font-size:.85em;cursor:pointer;color:var(--accent)}
-.formula-hint p{margin:.35rem 0;max-width:36ch;font-weight:400;color:var(--muted);font-size:var(--text-small)}
+.formula-hint{display:inline;margin-inline-start:.15rem}
+.formula-hint>summary{
+ display:inline-flex;align-items:center;justify-content:center;
+ inline-size:1.65rem;block-size:1.65rem;padding:0;gap:0;
+ vertical-align:middle;line-height:1;border-radius:50%;color:var(--accent);
+}
+.formula-hint>summary svg{display:block;inline-size:1.15rem;block-size:1.15rem;flex:none}
+.formula-hint[open]>summary,.formula-hint>summary:hover{background:var(--surface-soft)}
+.formula-hint>p{margin:.35rem 0;max-width:36ch;font-weight:400;color:var(--muted);font-size:var(--text-small)}
 #print-donate-button:empty{display:none}
 @media(max-width:760px){.intro-tools{flex-wrap:wrap}.budget-currency{justify-content:flex-start}.legal-page{padding-top:1.5rem}}

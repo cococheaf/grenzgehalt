@@ -1,4 +1,4 @@
-import { buildReport, renderReport, renderOverviewTable, renderLedgerTable, reportCsv } from './reporting.mjs?v=4.23.0';
+import { buildReport, renderReport, renderOverviewTable, renderLedgerTable, reportCsv } from './reporting.mjs?v=4.24.1';
 import { WORK_COUNTRIES, comparisonCountries, selectedCountries, switchPrimary, restoreCountryProfiles, countryInputs, calculateCountry, pairSummary, buildCountryComparison } from './country-workspace.mjs?v=4.23.0';
 import { buildComparisonTimeline } from './comparison-timeline.mjs?v=4.23.0';
 import { buildSalaryTimeline, buildAustrianTimeline, MONTHS, PAYDAY_NOTE } from './salary-timeline.mjs?v=4.23.0';
@@ -16,7 +16,7 @@ import { buildPaymentPlans, selectedPayment, paymentDifference, comparisonSummar
 import { liFamilyEstimate, suggestedLocalPremium } from './planning.mjs';
 import { shareHash, readShareHash } from './share.mjs';
 
-const APP_VERSION='4.24.0';
+const APP_VERSION='4.24.1';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const form=$('#calculator-form'), result=$('#result-content');
 const integer=new Intl.NumberFormat('de-AT',{maximumFractionDigits:0});
@@ -93,7 +93,7 @@ function jobDetails(country){
  const job=last.byCountry[country],c=buildReport([job]).countries[0];
  const explain=label=>ledgerExplanation(job,label);
  const taxTitle=job.result.resident?'Schweizer Steuermodell':job.result.publicLI?'Besteuerung in Liechtenstein nach Art. 19':'Österreichische Steuerplanung';
- return `<p class="ledger-period">${esc(c.name)} · ${c.periodLabel}</p><div class="ledger-grid"><section><h4>1. Auszahlung · ${c.currency}</h4>${renderLedgerTable(c.native,c.currency,{totalLast:true,explain})}</section><section><h4>2. Verfügbar · EUR</h4>${renderLedgerTable(c.budget,'EUR',{totalLast:true,explain})}</section></div>${c.fx?`<p class="table-note">CHF-Auszahlung × ${c.fx.toLocaleString('de-AT',{maximumFractionDigits:8})} = Auszahlung in EUR. Rücklage und EUR-Kosten folgen danach.</p>`:''}${c.contributions.length?`<details class="result-details native-fees"><summary>Lohnabzüge einzeln<span aria-hidden="true">+</span></summary><div class="details-body">${renderLedgerTable(c.contributions,c.currency,{explain})}<p class="table-note">${job.inputs.ownCount?'Bekannte eigene Angaben ergänzen die Modellwerte.':'PK, NBU und KTG sind geschätzt.'}</p></div></details>`:''}${country==='at'?withJob(country,()=>atDetail()):`<details class="result-details foreign-detail"><summary>${taxTitle}<span aria-hidden="true">+</span></summary><div class="details-body">${renderLedgerTable(c.tax,'EUR',{totalLast:true,explain})}<p class="table-note">Die Jahresveranlagung bleibt maßgebend. Sonderzahlungen und ein etwaiger Jahresabgleich sind im Jahresbudget enthalten.</p></div></details>`}<button type="button" class="text-button" data-view="method">Annahmen & Quellen ↗</button>`;
+ return `<p class="ledger-period">${esc(c.name)} · ${c.periodLabel}</p><div class="ledger-grid"><section data-ledger="payout"><h4>1. Auszahlung · ${c.currency}</h4>${renderLedgerTable(c.native,c.currency,{totalLast:true,explain})}</section><section data-ledger="available"><h4>2. Verfügbar · EUR</h4>${renderLedgerTable(c.budget,'EUR',{totalLast:true,explain})}</section></div>${c.fx?`<p class="table-note">CHF-Auszahlung × ${c.fx.toLocaleString('de-AT',{maximumFractionDigits:8})} = Auszahlung in EUR. Rücklage und EUR-Kosten folgen danach.</p>`:''}${c.contributions.length?`<details class="result-details native-fees"><summary>Lohnabzüge einzeln<span aria-hidden="true">+</span></summary><div class="details-body">${renderLedgerTable(c.contributions,c.currency,{explain})}<p class="table-note">${job.inputs.ownCount?'Bekannte eigene Angaben ergänzen die Modellwerte.':'PK, NBU und KTG sind geschätzt.'}</p></div></details>`:''}${country==='at'?withJob(country,()=>atDetail()):`<details class="result-details foreign-detail"><summary>${taxTitle}<span aria-hidden="true">+</span></summary><div class="details-body">${renderLedgerTable(c.tax,'EUR',{totalLast:true,explain})}<p class="table-note">Die Jahresveranlagung bleibt maßgebend. Sonderzahlungen und ein etwaiger Jahresabgleich sind im Jahresbudget enthalten.</p></div></details>`}<button type="button" class="text-button" data-view="method">Annahmen & Quellen ↗</button>`;
 }
 async function ensureSwissTariff(canton){
   if(!CANTONS[canton])throw new Error('Ungültiger Schweizer Kanton.');
@@ -327,7 +327,7 @@ function timelineMonthDetail(){
 function renderSalaryTimeline(){
   const t=last.timeline,max=Math.max(0,...t.months.map(m=>m.available)),min=Math.min(0,...t.months.map(m=>m.available)),range=max-min||1,zero=max/range*100;
   const shortMoney=n=>Math.abs(n)>=100000?new Intl.NumberFormat('de-AT',{notation:'compact',maximumFractionDigits:1}).format(n):whole(n);
-  return `<section class="section-card salary-timeline" aria-labelledby="salary-timeline-title"><div class="section-heading"><div><h2 id="salary-timeline-title">Zahltage im Jahr</h2></div><span>${t.payments} Bezüge · EUR</span></div><div class="pay-months" role="group" aria-label="Monat auswählen">${t.months.map(m=>{const y=(max-m.available)/range*100,top=Math.min(zero,y),height=m.available===0?0:Math.abs(zero-y);return `<button type="button" class="pay-month ${m.salaryCount>1?'has-extra':''} ${m.available<0?'negative':''} ${m.month===selectedPayMonth?'selected':''}" data-pay-month="${m.month}" aria-pressed="${m.month===selectedPayMonth}" aria-controls="payday-detail" aria-label="${m.name}: ${eur(m.available)} verfügbar, ${m.salaryCount} ${m.salaryCount===1?'Gehaltsbezug':'Gehaltsbezüge'}"><span class="pay-amount" aria-hidden="true">${shortMoney(m.available)}</span><span class="pay-chart" aria-hidden="true" style="--zero:${zero.toFixed(4)}%"><span class="pay-bar" style="top:${top.toFixed(4)}%;height:${height.toFixed(4)}%"></span></span><span class="pay-dots" aria-hidden="true">${Array.from({length:m.salaryCount},()=>'<i></i>').join('')}</span><span class="pay-month-label" aria-hidden="true">${m.short}</span></button>`;}).join('')}</div><p class="timeline-legend"><span><i></i> Ein Punkt je Gehaltsbezug</span><span>Monat anklicken für den genauen Betrag</span></p><div id="payday-detail" class="payday-detail" aria-live="polite">${timelineMonthDetail()}</div>${t.unassigned.length||Math.abs(t.adjustment?.available||0)>=.005?`<details class="result-details"><summary>Separate Jahrespositionen<span aria-hidden="true">+</span></summary><div class="details-body timeline-year-items">${t.unassigned.map(e=>`<p><span>${e.label} · ohne Monatszuordnung</span><strong>${eur(e.available)}</strong></p>`).join('')}${Math.abs(t.adjustment?.available||0)>=.005?`<p><span>${t.adjustment.label} · separat</span><strong>${eur(t.adjustment.available)}</strong></p>`:''}</div></details>`:''}${timelineHelp()}${!atPrimary()&&last.inputs.sources.special==='own'?`<p class="timeline-override">Eigene Sonderzahlungen: ${chf(last.inputs.li.special)} pro Jahr. Diese Angabe bestimmt die laufende Aufteilung. <button type="button" class="text-button" data-reset-special>Wieder automatisch aus ${t.payments} Gehältern berechnen</button></p>`:''}</section>`;
+  return `<section class="section-card salary-timeline" aria-labelledby="salary-timeline-title"><div class="section-heading"><div><h2 id="salary-timeline-title">Zahltage im Jahr</h2></div><span>${t.payments} Bezüge · EUR</span></div><div class="pay-months" role="group" aria-label="Monat auswählen">${t.months.map(m=>{const y=(max-m.available)/range*100,top=Math.min(zero,y),height=m.available===0?0:Math.abs(zero-y);return `<button type="button" class="pay-month ${m.salaryCount>1?'has-extra':''} ${m.available<0?'negative':''} ${m.month===selectedPayMonth?'selected':''}" data-pay-month="${m.month}" aria-pressed="${m.month===selectedPayMonth}" aria-controls="payday-detail" aria-describedby="pay-description-${m.month}"><span class="pay-amount">${shortMoney(m.available)}</span><span class="pay-chart" aria-hidden="true" style="--zero:${zero.toFixed(4)}%"><span class="pay-bar" style="top:${top.toFixed(4)}%;height:${height.toFixed(4)}%"></span></span><span class="pay-dots" aria-hidden="true">${Array.from({length:m.salaryCount},()=>'<i></i>').join('')}</span> <span class="pay-month-label">${m.short}</span><span hidden id="pay-description-${m.month}">${m.name}: ${eur(m.available)} verfügbar, ${m.salaryCount} ${m.salaryCount===1?'Gehaltsbezug':'Gehaltsbezüge'}</span></button>`;}).join('')}</div><p class="timeline-legend"><span><i></i> Ein Punkt je Gehaltsbezug</span><span>Monat anklicken für den genauen Betrag</span></p><div id="payday-detail" class="payday-detail" aria-live="polite">${timelineMonthDetail()}</div>${t.unassigned.length||Math.abs(t.adjustment?.available||0)>=.005?`<details class="result-details"><summary>Separate Jahrespositionen<span aria-hidden="true">+</span></summary><div class="details-body timeline-year-items">${t.unassigned.map(e=>`<p><span>${e.label} · ohne Monatszuordnung</span><strong>${eur(e.available)}</strong></p>`).join('')}${Math.abs(t.adjustment?.available||0)>=.005?`<p><span>${t.adjustment.label} · separat</span><strong>${eur(t.adjustment.available)}</strong></p>`:''}</div></details>`:''}${timelineHelp()}${!atPrimary()&&last.inputs.sources.special==='own'?`<p class="timeline-override">Eigene Sonderzahlungen: ${chf(last.inputs.li.special)} pro Jahr. Diese Angabe bestimmt die laufende Aufteilung. <button type="button" class="text-button" data-reset-special>Wieder automatisch aus ${t.payments} Gehältern berechnen</button></p>`:''}</section>`;
 }
 function comparisonMonthDetail(){
   const m=last.comparisonTimeline.months[selectedPayMonth]||last.comparisonTimeline.months[0],order=countryOrder(),diff=round(m[order[0]]-m[order[1]]);
@@ -342,7 +342,7 @@ function renderComparisonTimeline(){
   const t=last.comparisonTimeline,values=t.months.flatMap(m=>countryOrder().map(c=>m[c])),max=Math.max(0,...values),min=Math.min(0,...values),range=max-min||1,zero=max/range*100;
   const bar=(m,country)=>{const y=(max-m[country])/range*100;return `<span class="comparison-pay-chart ${country===countryOrder()[0]?'foreign':'at'}" style="--zero:${zero.toFixed(4)}%"><span class="comparison-pay-bar ${m[country]<0?'negative':''}" style="top:${Math.min(zero,y).toFixed(4)}%;height:${Math.abs(zero-y).toFixed(4)}%"></span></span>`;};
   const dots=(count,country)=>`<span class="comparison-pay-dots ${country===countryOrder()[0]?'foreign':'at'}">${Array.from({length:count},()=>'<i></i>').join('')}</span>`;
-  return `<section class="section-card comparison-timeline" aria-labelledby="comparison-timeline-title"><div class="section-heading"><div><h2 id="comparison-timeline-title">Zahltage im Vergleich</h2></div><span>EUR · ca. · Auszahlungsmonat</span></div><div class="comparison-timeline-legend">${countryOrder().map(key=>`<span class="${key===countryOrder()[0]?'foreign':'at'}"><i></i>${countryName(key)}</span>`).join('')}<small>Ein Punkt je Gehaltsbezug</small></div><div class="comparison-pay-months" role="group" aria-label="Vergleichsmonat auswählen">${t.months.map(m=>`<button type="button" class="comparison-pay-month ${m.month===selectedPayMonth?'selected':''}" data-pay-month="${m.month}" aria-pressed="${m.month===selectedPayMonth}" aria-controls="payday-detail" aria-label="${m.name}: ${countryOrder().map(key=>countryName(key)+' '+eur(m[key])+', '+m[key+'Count']+' Bezüge').join('; ')}; Differenz ${countryOrder().map(countryCode).join(' minus ')} ${eur(round(m[countryOrder()[0]]-m[countryOrder()[1]]))}"><span class="comparison-pay-pair" aria-hidden="true">${countryOrder().map(key=>bar(m,key)).join('')}</span><span class="comparison-dot-pair" aria-hidden="true">${countryOrder().map(key=>dots(m[key+'Count'],key)).join('')}</span><span class="pay-month-label" aria-hidden="true">${m.short}</span></button>`).join('')}</div><div id="payday-detail" class="comparison-payday-detail" aria-live="polite">${comparisonMonthDetail()}</div>${t.separate.length?`<details class="result-details comparison-separate"><summary>Bonus & Jahresabgleich separat<span aria-hidden="true">+</span></summary><div class="details-body"><div class="table-scroll">${comparisonBudgetTable(t.separate)}</div></div></details>`:''}${timelineHelp()}</section>`;
+  return `<section class="section-card comparison-timeline" aria-labelledby="comparison-timeline-title"><div class="section-heading"><div><h2 id="comparison-timeline-title">Zahltage im Vergleich</h2></div><span>EUR · ca. · Auszahlungsmonat</span></div><div class="comparison-timeline-legend">${countryOrder().map(key=>`<span class="${key===countryOrder()[0]?'foreign':'at'}"><i></i>${countryName(key)}</span>`).join('')}<small>Ein Punkt je Gehaltsbezug</small></div><div class="comparison-pay-months" role="group" aria-label="Vergleichsmonat auswählen">${t.months.map(m=>`<button type="button" class="comparison-pay-month ${m.month===selectedPayMonth?'selected':''}" data-pay-month="${m.month}" aria-pressed="${m.month===selectedPayMonth}" aria-controls="payday-detail" aria-label="${m.short} · ${m.name}: ${countryOrder().map(key=>countryName(key)+' '+eur(m[key])+', '+m[key+'Count']+' Bezüge').join('; ')}; Differenz ${countryOrder().map(countryCode).join(' minus ')} ${eur(round(m[countryOrder()[0]]-m[countryOrder()[1]]))}"><span class="comparison-pay-pair" aria-hidden="true">${countryOrder().map(key=>bar(m,key)).join('')}</span><span class="comparison-dot-pair" aria-hidden="true">${countryOrder().map(key=>dots(m[key+'Count'],key)).join('')}</span><span class="pay-month-label" aria-hidden="true">${m.short}</span></button>`).join('')}</div><div id="payday-detail" class="comparison-payday-detail" aria-live="polite">${comparisonMonthDetail()}</div>${t.separate.length?`<details class="result-details comparison-separate"><summary>Bonus & Jahresabgleich separat<span aria-hidden="true">+</span></summary><div class="details-body"><div class="table-scroll">${comparisonBudgetTable(t.separate)}</div></div></details>`:''}${timelineHelp()}</section>`;
 }
 function comparisonTimelinePrint(){const t=last.comparisonTimeline;return `<section class="comparison-timeline-print"><h2>Jahresverlauf · beide verfügbaren Monatsbudgets</h2><p class="print-note">Planungsannahme: ${countryOrder().map(c=>countryCode(c)+' · '+t.schedule[c]).join('; ')}. Beträge nach Abgaben, Versicherung und Kosten. ${PAYDAY_NOTE}</p>${comparisonBudgetTable(comparisonTimelineRows())}</section>`;}
 function timelinePrint(){const t=last.timeline;return `<section class="timeline-print"><h2>Jahresverlauf · verfügbare Monatsbeträge</h2><p class="print-note">${t.schedule}. Geplanter Zahlungszeitpunkt; Krankenversicherung, AT-Rücklage und Kosten enthalten. ${PAYDAY_NOTE}</p><table><thead><tr><th>Auszahlungsmonat</th><th>Bezüge</th><th>Verfügbar EUR · ca.</th></tr></thead><tbody>${t.months.map(m=>`<tr><td>${m.name}</td><td>${m.salaryCount}</td><td>${eur(m.available)}</td></tr>`).join('')}${t.unassigned.map(e=>`<tr><td>${e.label} · ohne Monatszuordnung</td><td>separat</td><td>${eur(e.available)}</td></tr>`).join('')}${Math.abs(t.adjustment?.available||0)>=.005?`<tr><td>${t.adjustment.label}</td><td>separat</td><td>${eur(t.adjustment.available)}</td></tr>`:''}<tr class="total"><td>Jahresbudget gesamt</td><td></td><td>${eur(t.annualAvailable)}</td></tr></tbody></table></section>`;}
@@ -515,20 +515,33 @@ function prepareReadableTables(root){
  for(const table of root.querySelectorAll('table')){
   let wrapper=table.parentElement;
   if(!wrapper.classList.contains('table-scroll')){wrapper=document.createElement('div');wrapper.className='table-scroll';table.before(wrapper);wrapper.append(table);}
-  wrapper.tabIndex=0;wrapper.setAttribute('role','region');wrapper.setAttribute('aria-label','Tabelle – bei Bedarf seitlich scrollen');
+  wrapper.tabIndex=0;wrapper.setAttribute('role','group');wrapper.setAttribute('aria-label','Tabelle – bei Bedarf seitlich scrollen');
  }
 }
-function syncDisclosureIcons(root=document){prepareReadableTables(root===document?result:root);for(const detail of root.querySelectorAll('details')){const icon=detail.querySelector(':scope > summary > [aria-hidden="true"]');if(icon)icon.textContent=detail.open?'−':'+';}}
-document.addEventListener('toggle',event=>{const detail=event.target;if(detail instanceof HTMLDetailsElement){const icon=detail.querySelector(':scope > summary > [aria-hidden="true"]');if(icon)icon.textContent=detail.open?'−':'+';}},true);
+function syncDisclosureIcons(root=document){prepareReadableTables(root===document?result:root);for(const detail of root.querySelectorAll('details')){const icon=detail.querySelector(':scope > summary > span[aria-hidden="true"]');if(icon)icon.textContent=detail.open?'−':'+';}}
+document.addEventListener('toggle',event=>{const detail=event.target;if(detail instanceof HTMLDetailsElement){const icon=detail.querySelector(':scope > summary > span[aria-hidden="true"]');if(icon)icon.textContent=detail.open?'−':'+';}},true);
 function renderResult(html){
  const key=detail=>{
   const path=[];let node=detail;
-  while(node&&node!==result){if(node.tagName==='DETAILS')path.unshift(node.querySelector(':scope > summary')?.textContent.replace(/[+−]$/,'').trim()||'');node=node.parentElement;}
+  while(node&&node!==result){
+   if(node.tagName==='DETAILS'){
+    const summary=node.querySelector(':scope > summary');
+    path.unshift(summary?.getAttribute('aria-label')||summary?.textContent.replace(/[+−]$/,'').trim()||'');
+   }
+   if(node.hasAttribute('data-ledger'))path.unshift(node.dataset.ledger);
+   node=node.parentElement;
+  }
   return (detail.closest('[data-country]')?.dataset.country||'main')+':'+path.join('/');
  };
+ const active=document.activeElement;
+ const focusedDetails=active?.matches('summary')&&result.contains(active)?key(active.parentElement):null;
  const state=new Map([...result.querySelectorAll('details')].map(detail=>[key(detail),detail.open]));
  result.innerHTML=html;
- for(const detail of result.querySelectorAll('details'))if(state.has(key(detail)))detail.open=state.get(key(detail));
+ for(const detail of result.querySelectorAll('details')){
+  const id=key(detail);
+  if(state.has(id))detail.open=state.get(id);
+  if(id===focusedDetails)detail.querySelector(':scope > summary')?.focus({preventScroll:true});
+ }
  syncDisclosureIcons(result);
 }
 
@@ -945,7 +958,7 @@ result.addEventListener('click',event=>{
  $(country==='at'?'#at-gross':'#li-annual').focus();
 });
 function exampleState(){const country=rawState().foreignCountry,calculatorCountry=rawState().calculatorCountry;applyState({...defaults,calculatorCountry,foreignCountry:country});previousCountry=country;example=true;rateController.restore({source:'example',automatic:true});restoreInputOptions();update();void rateController.setAutomatic(true);toast('Fiktive Beispielrechnung geladen.');}
-document.addEventListener('change',event=>{if(event.target.name==='comparisonPeriod'&&['monthly','annual'].includes(event.target.value)){comparisonPeriod=event.target.value;update();}});
+document.addEventListener('change',event=>{if(event.target.name==='comparisonPeriod'&&['monthly','annual'].includes(event.target.value)){comparisonPeriod=event.target.value;update();result.querySelector('[name="comparisonPeriod"]:checked')?.focus({preventScroll:true});}});
 document.addEventListener('click',event=>{const monthButton=event.target.closest('[data-pay-month]');if(monthButton&&last){selectedPayMonth=Number(monthButton.dataset.payMonth);for(const button of $$('[data-pay-month]')){const selected=Number(button.dataset.payMonth)===selectedPayMonth;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));}$('#payday-detail').innerHTML=view==='compare'?comparisonMonthDetail():timelineMonthDetail();syncDisclosureIcons($('#payday-detail'));persist();}const nav=event.target.closest('[data-view]');if(nav){event.preventDefault();changeView(nav.dataset.view,true);}if(event.target.closest('[data-result]')){update();$('#results-panel').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});}if(event.target.closest('[data-example]'))exampleState();if(event.target.closest('[data-reset-special]')){form.elements.specialOverride.checked=false;form.elements.exactSpecial.value='';example=false;update();toast('Sonderzahlungen werden wieder aus der Gehaltsanzahl berechnet.');}if(event.target.closest('[data-retry-swiss]')){for(const canton of [...swissCache.keys()])if(swissCache.get(canton)?.error)swissCache.delete(canton);update();}if(!event.target.closest('.export-wrap'))closeMenu();});
 $('#export-toggle').addEventListener('click',()=>{const open=$('#export-menu').hidden;$('#export-menu').hidden=!open;$('#export-toggle').setAttribute('aria-expanded',String(open));if(open)$('#report-detail').focus();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('#export-menu').hidden){closeMenu();$('#export-toggle').focus();}if(!$('#export-menu').hidden&&event.target.tagName!=='SELECT'&&['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();const options=$$('#export-menu button');let i=options.indexOf(document.activeElement);i=(i+(event.key==='ArrowDown'?1:-1)+options.length)%options.length;options[i].focus();}});
@@ -995,17 +1008,22 @@ let savedFx=null;applyState(defaults);
 try{const saved=localStorage.getItem(storageKey);if(saved){const data=JSON.parse(saved);if(data.schema==='grenzgehalt/4'&&data.year===2026){const legacy=data.model!==MODEL.version;comparisonPeriod=['monthly','annual'].includes(data.comparisonPeriod)?data.comparisonPeriod:'monthly';selectedPayMonth=Number.isInteger(data.selectedPayMonth)&&data.selectedPayMonth>=0&&data.selectedPayMonth<12?data.selectedPayMonth:0;resultCurrency=data.resultCurrency==='CHF'?'CHF':'EUR';threeWay=data.threeWay===true;sameGross=data.sameGross===true;applyState(sanitizeState(data.inputs,{legacy}));countryProfiles=restoreCountryProfiles(rawState(),data.countryProfiles);previousCountry=rawState().foreignCountry;example=data.example===true;savedFx=data.exchangeRate||{source:'manual',automatic:false};$('#remember').checked=true;if(legacy)toast('Gespeicherte Eingaben geladen. PK und LI-KK werden zwölfmal pro Jahr berücksichtigt.');}}}catch{toast('Gespeicherte Angaben konnten nicht geladen werden. Die Beispielwerte sind aktiv.');}
 if(savedFx)rateController.restore(savedFx);
 renderFxStatus(rateController.state);fxReady=true;
-try{
- const snapshot=readShareHash(location.hash);
- if(snapshot){
-  $('#remember').checked=false;
-  applySnapshot(snapshot);
-  toast('Geteilte Rechnung geladen.');
- }else changeView(location.hash.slice(1)||'calculator');
-}catch{
- changeView('calculator');
- toast('Der Rechenlink konnte nicht geladen werden.');
+function openHash(){
+ try{
+  const snapshot=readShareHash(location.hash);
+  if(snapshot){
+   if(shareDialog.open)shareDialog.close();
+   $('#remember').checked=false;
+   applySnapshot(snapshot);
+   toast('Geteilte Rechnung geladen.');
+  }else changeView(location.hash.slice(1)||'calculator');
+ }catch{
+  changeView('calculator');
+  toast('Der Rechenlink konnte nicht geladen werden.');
+ }
 }
+openHash();
+window.addEventListener('hashchange',openHash);
 if(rateController.state.automatic)void rateController.refresh();
 $('#fx-refresh').addEventListener('click',()=>{void rateController.refresh({force:true});});
 $('#fx-auto').addEventListener('change',event=>{void rateController.setAutomatic(event.target.checked);});

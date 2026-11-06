@@ -55,7 +55,15 @@ function calendarTable(report,detailed=false){
 export function renderLedgerTable(rows,currency,{totalLast=false,explain}={}){
  const body=rows.map((r,i)=>{
   const note=explain?.(r.label);
-  const hint=note?`<details class="formula-hint"><summary aria-label="Rechenhinweis zu ${esc(r.label)}">i</summary><p>${esc(note)}</p></details>`:'';
+  const hint=note?`<details class="formula-hint">
+   <summary aria-label="Rechenhinweis zu ${esc(r.label)}">
+    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false">
+     <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+     <circle cx="10" cy="6.3" r="1" fill="currentColor"/>
+     <path d="M10 9.5v4.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+   </summary><p>${esc(note)}</p>
+  </details>`:'';
   return `<tr class="${totalLast&&i===rows.length-1?'report-total':''}"><th scope="row">${esc(r.label)}${hint}</th><td>${nf.format(r.value)} ${esc(currency)}</td></tr>`;
  });
  return `<table class="report-table"><thead><tr><th>Position</th><th>${esc(currency)}</th></tr></thead><tbody>${body.join('')}</tbody></table>`;
