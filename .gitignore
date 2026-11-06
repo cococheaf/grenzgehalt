@@ -1,0 +1,15 @@
+tmp/
+output/
+.DS_Store
+*.log
+__pycache__/
+/dist/assets/site-contact.mjs
+/docs/verification.json
+/docs/swiss/*.zip
+/tests/payroll-2026.test.mjs
+/tests/payroll-reconciliation.test.mjs
+/docs/internal/
+/dist/assets/ch-tariffs-*.mjs
+/scripts/install-release.py
+/docs/austria-research.md
+/docs/liechtenstein-research.txt

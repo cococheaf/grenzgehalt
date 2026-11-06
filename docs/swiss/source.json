@@ -1,0 +1,191 @@
+{
+  "source": "https://www.estv2.admin.ch/qst/2026/loehne/tar2026txt.zip",
+  "record_format": "https://www.estv.admin.ch/dam/de/sd-web/AvojuyFCZY95/qst-tarife-recordformate-loehne-2025-de.pdf",
+  "sha256": "619b53e364545ffcd32e01669983326f79e5dea82c520de5e158c4e9e10943d6",
+  "year": 2026,
+  "verified": "2026-10-25",
+  "cantons": {
+    "AG": {
+      "source_records": 19500,
+      "tariffs": 78,
+      "compressed_rows": 7428,
+      "created": "20260304",
+      "bytes": 30764
+    },
+    "AI": {
+      "source_records": 34924,
+      "tariffs": 78,
+      "compressed_rows": 27813,
+      "created": "20251209",
+      "bytes": 143376
+    },
+    "AR": {
+      "source_records": 43212,
+      "tariffs": 78,
+      "compressed_rows": 39668,
+      "created": "20251202",
+      "bytes": 208776
+    },
+    "BE": {
+      "source_records": 97578,
+      "tariffs": 78,
+      "compressed_rows": 84105,
+      "created": "20251127",
+      "bytes": 464476
+    },
+    "BL": {
+      "source_records": 47502,
+      "tariffs": 78,
+      "compressed_rows": 41828,
+      "created": "20251120",
+      "bytes": 216620
+    },
+    "BS": {
+      "source_records": 43886,
+      "tariffs": 78,
+      "compressed_rows": 38285,
+      "created": "20251204",
+      "bytes": 207212
+    },
+    "FR": {
+      "source_records": 156000,
+      "tariffs": 78,
+      "compressed_rows": 84666,
+      "created": "20251118",
+      "bytes": 470100
+    },
+    "GE": {
+      "source_records": 31359,
+      "tariffs": 23,
+      "compressed_rows": 30901,
+      "created": "20251025",
+      "bytes": 170700
+    },
+    "GL": {
+      "source_records": 46098,
+      "tariffs": 78,
+      "compressed_rows": 39531,
+      "created": "20251204",
+      "bytes": 221900
+    },
+    "GR": {
+      "source_records": 42198,
+      "tariffs": 78,
+      "compressed_rows": 29064,
+      "created": "20251210",
+      "bytes": 155876
+    },
+    "JU": {
+      "source_records": 116649,
+      "tariffs": 39,
+      "compressed_rows": 53722,
+      "created": "20251117",
+      "bytes": 297500
+    },
+    "LU": {
+      "source_records": 60840,
+      "tariffs": 78,
+      "compressed_rows": 56414,
+      "created": "20251126",
+      "bytes": 296996
+    },
+    "NE": {
+      "source_records": 116649,
+      "tariffs": 39,
+      "compressed_rows": 46122,
+      "created": "20251212",
+      "bytes": 256220
+    },
+    "NW": {
+      "source_records": 154518,
+      "tariffs": 78,
+      "compressed_rows": 79105,
+      "created": "20251209",
+      "bytes": 434264
+    },
+    "OW": {
+      "source_records": 24180,
+      "tariffs": 78,
+      "compressed_rows": 19394,
+      "created": "20251205",
+      "bytes": 89424
+    },
+    "SG": {
+      "source_records": 54678,
+      "tariffs": 78,
+      "compressed_rows": 45732,
+      "created": "20251210",
+      "bytes": 234668
+    },
+    "SH": {
+      "source_records": 47424,
+      "tariffs": 78,
+      "compressed_rows": 42972,
+      "created": "20251205",
+      "bytes": 223760
+    },
+    "SO": {
+      "source_records": 156078,
+      "tariffs": 78,
+      "compressed_rows": 92105,
+      "created": "20251127",
+      "bytes": 507280
+    },
+    "SZ": {
+      "source_records": 61612,
+      "tariffs": 78,
+      "compressed_rows": 51875,
+      "created": "20251219",
+      "bytes": 274072
+    },
+    "TG": {
+      "source_records": 47034,
+      "tariffs": 78,
+      "compressed_rows": 41247,
+      "created": "20251205",
+      "bytes": 212356
+    },
+    "TI": {
+      "source_records": 77844,
+      "tariffs": 39,
+      "compressed_rows": 12262,
+      "created": "20251126",
+      "bytes": 47004
+    },
+    "UR": {
+      "source_records": 79638,
+      "tariffs": 78,
+      "compressed_rows": 66442,
+      "created": "20251120",
+      "bytes": 371236
+    },
+    "VD": {
+      "source_records": 17858,
+      "tariffs": 39,
+      "compressed_rows": 17856,
+      "created": "20251016",
+      "bytes": 95508
+    },
+    "VS": {
+      "source_records": 38883,
+      "tariffs": 39,
+      "compressed_rows": 28714,
+      "created": "20251125",
+      "bytes": 155376
+    },
+    "ZG": {
+      "source_records": 266954,
+      "tariffs": 78,
+      "compressed_rows": 91422,
+      "created": "20251202",
+      "bytes": 502468
+    },
+    "ZH": {
+      "source_records": 24570,
+      "tariffs": 78,
+      "compressed_rows": 16532,
+      "created": "20251208",
+      "bytes": 72484
+    }
+  }
+}
