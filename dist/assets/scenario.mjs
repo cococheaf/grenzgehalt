@@ -1,12 +1,12 @@
-import { planningDefaults, foreignPlanningKeys, estimatedSwissPension, suggestedLocalPremium, liPublicWithholding } from './planning.mjs';
-import { TAX } from './tax-data.mjs?v=4.23.0';
-import { parseNumber } from './numbers.mjs?v=4.23.0';
-import { calculateLI, calculateCH, calculateAT, round } from './calculator.mjs?v=4.23.0';
-import { CANTONS, swissAnnualSource } from './swiss.mjs?v=4.23.0';
+import { planningDefaults, foreignPlanningKeys, estimatedSwissPension, suggestedLocalPremium, liPublicWithholding } from './planning.mjs?v=4.25.0';
+import { TAX, taxForYear, calculationNotes } from './tax-data.mjs?v=4.25.0';
+import { parseNumber } from './numbers.mjs?v=4.25.0';
+import { calculateLI, calculateCH, calculateAT, round } from './calculator.mjs?v=4.25.0';
+import { CANTONS, swissAnnualSource } from './swiss.mjs?v=4.25.0';
 export const COUNTRIES=Object.freeze({li:{name:'Liechtenstein',code:'LI'},ch:{name:'Schweiz',code:'CH'}});
-export const MODEL=Object.freeze({version:'2026.12',pension:.065,pensionEntry:14700,nbu:1,ktg:.5,health:TAX.healthMonthly,subsidy:TAX.li.healthEmployerMonthly,chPensionEntry:22680});
+export const MODEL=Object.freeze({version:'2027.1',pension:.065,pensionEntry:14700,nbu:1,ktg:.5,health:TAX.healthMonthly,subsidy:TAX.li.healthEmployerMonthly,chPensionEntry:22680});
 export const defaults=Object.freeze({
-  ...planningDefaults,
+  ...planningDefaults,taxYear:'2026',atEmployment:'new',
   calculatorCountry:'li',comparisonCountry:'at',foreignCountry:'li',healthType:'oegk',privateMonthly:'',privateDeductible:'',chCanton:'SG',chTariff:'A',chChildren:'0',chChurch:false,
   foreignPeriod:'annual',liAnnual:'90.000',liPayments:'13',liBonus:'0',fx:'1,0600',liDistance:'0',liPp:'none',liDays:'11',liCosts:'0',
   atGross:'5.000',atPeriod:'monthly',atRegion:'vorarlberg',atBenefit:'0',atFree:'0',atCar:false,atDistance:'0',atPp:'none',atDays:'11',atCosts:'0',
@@ -52,12 +52,12 @@ export function sanitizeProfiles(profiles){
   }return safe;
 }
 const rules={atChurch:[0,100000,'Kirchenbeitrag'],atExpenses:[0,500000,'Werbungskosten'],liWorkload:[1,100,'Pensum'],chPriceFactor:[0.1,10,'Preisniveau'],mobilityCHF:[0,100000,'Mobilitätsbonus'],mealsCHF:[0,100000,'Essenszuschuss'],parkingCHF:[0,100000,'Parkplatz'],familyCashCHF:[0,100000,'Familienzulagen'],liAnnual:[0,5000000,'Brutto im Arbeitsland'],liBonus:[0,5000000,'Bonus'],fx:[0,10,'CHF/EUR-Kurs'],liDistance:[0,1000,'Pendlerstrecke Ausland'],liCosts:[0,100000,'Kosten Ausland'],atGross:[0,28000000,'Brutto Österreich'],atBenefit:[0,100000,'Sachbezug'],atFree:[0,100000,'Freibetrag'],atDistance:[0,1000,'Pendlerstrecke AT'],atCosts:[0,100000,'Kosten AT'],childrenYoung:[0,20,'Kinder unter 18'],childrenAdult:[0,20,'Kinder ab 18']};
-const choices={atPayments:['12','14'],liEmployer:['private','public'],liCivil:['single','married'],pensionAge:['standard','liMinor','liYouth','chUnder25','ch25','ch35','ch45','ch55'],chResidence:['at','ch'],chTaxMode:['withholding','ordinary'],foreignCountry:['li','ch'],healthType:['oegk','private','local'],chCanton:Object.keys(CANTONS),chTariff:['A','B','C','H'],chChildren:Array.from({length:10},(_,i)=>String(i)),liPayments:['12','13','14'],atPeriod:['monthly','annual'],atRegion:['vorarlberg','tirol','salzburg','oberoesterreich','niederoesterreich','wien','steiermark','kaernten','burgenland'],liPp:['none','small','large'],atPp:['none','small','large'],liDays:['0','4','8','11'],atDays:['0','4','8','11'],familyShare:['0','0.5','1']};
+const choices={taxYear:['2026','2027'],atEmployment:['existing','new'],atPayments:['12','14'],liEmployer:['private','public'],liCivil:['single','married'],pensionAge:['standard','liMinor','liYouth','chUnder25','ch25','ch35','ch45','ch55'],chResidence:['at','ch'],chTaxMode:['withholding','ordinary'],foreignCountry:['li','ch'],healthType:['oegk','private','local'],chCanton:Object.keys(CANTONS),chTariff:['A','B','C','H'],chChildren:Array.from({length:10},(_,i)=>String(i)),liPayments:['12','13','14'],atPeriod:['monthly','annual'],atRegion:['vorarlberg','tirol','salzburg','oberoesterreich','niederoesterreich','wien','steiermark','kaernten','burgenland'],liPp:['none','small','large'],atPp:['none','small','large'],liDays:['0','4','8','11'],atDays:['0','4','8','11'],familyShare:['0','0.25','0.5','0.75','1']};
 choices.liRounding=['cent','nickel'];
 choices.contributionUnit=['percent','annual'];
 choices.foreignPeriod=['monthly','annual'];
 choices.pensionPeriod=['monthly','annual'];
-const NEW_KEYS=new Set([...Object.keys(planningDefaults),'specialOverride','liRounding','pensionPeriod','foreignPeriod','foreignCountry','healthType','privateMonthly','privateDeductible','chCanton','chTariff','chChildren','chChurch','liExact','supplementEnabled','contributionUnit',...Object.keys(EXACT_FIELDS)]);
+const NEW_KEYS=new Set(['taxYear','atEmployment',...Object.keys(planningDefaults),'specialOverride','liRounding','pensionPeriod','foreignPeriod','foreignCountry','healthType','privateMonthly','privateDeductible','chCanton','chTariff','chChildren','chChurch','liExact','supplementEnabled','contributionUnit',...Object.keys(EXACT_FIELDS)]);
 function migratePayrollInputs(data){
   const migrated={...data};
   if(!('calculatorCountry'in data))migrated.calculatorCountry=data.foreignCountry||'li';
@@ -83,10 +83,17 @@ export function sanitizeState(data,{legacy=false}={}){
     if(typeof value!==typeof original||typeof value==='string'&&value.length>50)throw new Error('Unvollständige oder ungültige Eingaben in der Datei.');safe[key]=value;
   }readInputs(safe,{scope:safe.calculatorCountry==='at'?'at':'foreign'});return safe;
 }
+export function readSnapshotInputs(data){
+  if(data?.schema!=='grenzgehalt/4'||![2026,2027].includes(data.year))throw new Error('Bitte eine Grenzgehalt-Berechnung für 2026 oder 2027 wählen.');
+  if(!data.inputs||typeof data.inputs!=='object'||Array.isArray(data.inputs))throw new Error('Die Datei enthält keine gültigen Eingaben.');
+  if(data.inputs.taxYear!==undefined&&data.inputs.taxYear!==String(data.year))throw new Error('Steuerjahr und Eingaben der Datei stimmen nicht überein.');
+  return sanitizeState({...data.inputs,taxYear:String(data.year)},{legacy:data.model!==MODEL.version});
+}
 export function readInputs(original,{swissData,scope='both'}={}){
   if(!['both','at','foreign'].includes(scope))throw new Error('Ungültiger Berechnungsumfang.');
   // An independent calculator must not depend on unfinished fields of the other job.
   const raw={...defaults,...original};
+  const TAX=taxForYear(Number(raw.taxYear));
   if(scope==='at')for(const key of [...PROFILE_KEYS,'fx','chCanton','chTariff','chChildren','chChurch'])raw[key]=defaults[key];
   if(scope==='at')raw.foreignCountry=defaults.foreignCountry;
   if(scope==='foreign')for(const key of Object.keys(defaults).filter(k=>k.startsWith('at')&&!['atExpenses','atChurch'].includes(k)))raw[key]=defaults[key];
@@ -101,6 +108,7 @@ export function readInputs(original,{swissData,scope='both'}={}){
   if(n.liAnnual>0&&n.fx<=0)throw new Error('Bitte einen positiven CHF/EUR-Kurs eingeben.');
   const annual=annualGross(n.liAnnual,raw.foreignPeriod,Number(raw.liPayments));
   if(annual>5000000)throw new Error('Das hochgerechnete Vertrags-Jahresbrutto darf 5.000.000 CHF nicht überschreiten.');
+  if(TAX.year===2026&&['0.25','0.75'].includes(raw.familyShare))throw new Error('Die Aufteilung 75/25 ist erst ab 2027 vorgesehen.');
   const ch=raw.foreignCountry==='ch';
   const liMinor=!ch&&raw.pensionAge==='liMinor';
   const liYouth=liMinor||!ch&&raw.pensionAge==='liYouth';
@@ -111,10 +119,10 @@ export function readInputs(original,{swissData,scope='both'}={}){
   const atSupplement=raw.atSupplementEnabled===true?parseNumber(raw.atSupplement):0;
   if(!Number.isFinite(atSupplement)||atSupplement<0||atSupplement>100000)throw new Error('Zusatzversicherung Österreich: Bitte eine gültige monatliche Prämie eingeben.');
   if(!Number.isFinite(supplement)||supplement<0||supplement>100000)throw new Error('Zusatzversicherung: Bitte eine gültige monatliche Prämie eingeben.');
-  let health=MODEL.health,healthDeductible=MODEL.health;
+  let health=TAX.healthMonthly,healthDeductible=TAX.healthMonthly;
   if(localHealth){
     const premium=String(raw.localHealthCHF).trim()===''
-      ? suggestedLocalPremium({country:raw.foreignCountry,resident,canton:raw.chCanton,age:raw.pensionAge})
+      ? suggestedLocalPremium({country:raw.foreignCountry,resident,canton:raw.chCanton,age:raw.pensionAge,year:TAX.year})
       : parseNumber(raw.localHealthCHF);
     if(!Number.isFinite(premium)||premium<=0||premium>100000)throw new Error('Bitte eine gültige monatliche OKP-/KVG-Prämie in CHF eingeben.');
     health=premium*n.fx;
@@ -125,12 +133,12 @@ export function readInputs(original,{swissData,scope='both'}={}){
     if(!Number.isFinite(health)||health<=0||health>100000)throw new Error('Bitte die monatliche Prämie deiner privaten Grenzgänger-Krankenversicherung eingeben.');
     if(!Number.isFinite(healthDeductible)||healthDeductible<0||healthDeductible>health)throw new Error('Der steuerlich anerkannte Pflichtanteil muss zwischen 0 und der privaten Prämie liegen.');
   }
-  const shared={year:2026,childrenYoung:n.childrenYoung,childrenAdult:n.childrenAdult,familyShare:Number(raw.familyShare),avab:raw.avab,expenses:n.atExpenses,church:n.atChurch};
+  const shared={year:TAX.year,childrenYoung:n.childrenYoung,childrenAdult:n.childrenAdult,familyShare:Number(raw.familyShare),avab:raw.avab,expenses:n.atExpenses,church:n.atChurch};
   const pension=ch
-    ? (raw.pensionAge==='standard'&&!resident ? (annual>MODEL.chPensionEntry?round(annual*MODEL.pension):0)
-      : estimatedSwissPension(annual,raw.pensionAge==='standard'?'ch35':raw.pensionAge))
+    ? (raw.pensionAge==='standard'&&!resident ? (annual>TAX.swissPension.entry?round(annual*MODEL.pension):0)
+      : estimatedSwissPension(annual,raw.pensionAge==='standard'?'ch35':raw.pensionAge,TAX.year))
     : (annual>=MODEL.pensionEntry&&!liYouth?round(annual*MODEL.pension):0);
-  const automatic={pension,nbuAnnual:round(Math.min(gross,148200)*MODEL.nbu/100),ktgAnnual:round(Math.min(gross,148200)*MODEL.ktg/100),health,healthSubsidy:ch?0:round(MODEL.subsidy*n.liWorkload/100*(liYouth?.5:1)),special:annual*(Number(raw.liPayments)-12)/Number(raw.liPayments),sourceAnnual:publicLI?liPublicWithholding(gross,raw.liCivil):0,otherAnnual:0};
+  const automatic={pension,nbuAnnual:round(Math.min(gross,148200)*MODEL.nbu/100),ktgAnnual:round(Math.min(gross,148200)*MODEL.ktg/100),health,healthSubsidy:ch?0:round(TAX.li.healthEmployerMonthly*n.liWorkload/100*(liYouth?.5:1)),special:annual*(Number(raw.liPayments)-12)/Number(raw.liPayments),sourceAnnual:publicLI?liPublicWithholding(gross,raw.liCivil):0,otherAnnual:0};
   const applied={...automatic},sources={};let ownCount=privateHealth?1:0;
   for(const field of Object.keys(EXACT_FIELDS)){
     const {key,label,max,percent,pensionMonth}=exactFieldMeta(field,raw);
@@ -149,13 +157,14 @@ export function readInputs(original,{swissData,scope='both'}={}){
   let sourceQuote=null;
   if(ch){
     if(sources.sourceAnnual!=='own'&&raw.chTariff==='H'&&raw.chChildren==='0')throw new Error('CH-Tarif H benötigt mindestens ein abzugsberechtigtes Kind.');
-    if(swissData&&sources.sourceAnnual!=='own'){try{sourceQuote=swissAnnualSource({annual:fullAnnual,bonus:n.liBonus,special:applied.special,payments:raw.liPayments,canton:raw.chCanton,tariff:raw.chTariff,children:Number(raw.chChildren),church:raw.chChurch},swissData);automatic.sourceAnnual=sourceQuote.tax;}catch(error){if(sources.sourceAnnual!=='own')throw error;}}
+    if(swissData&&sources.sourceAnnual!=='own'){try{sourceQuote=swissAnnualSource({year:TAX.year,annual:fullAnnual,bonus:n.liBonus,special:applied.special,payments:raw.liPayments,canton:raw.chCanton,tariff:raw.chTariff,children:Number(raw.chChildren),church:raw.chChurch},swissData);automatic.sourceAnnual=sourceQuote.tax;}catch(error){if(sources.sourceAnnual!=='own')throw error;}}
     if(sources.sourceAnnual!=='own')applied.sourceAnnual=automatic.sourceAnnual;
     if(applied.sourceAnnual>gross)throw new Error('Die Schweizer Quellensteuer darf das Brutto nicht überschreiten.');
   }
-  return {raw:{...defaults,...original},scope,automatic,sources,ownCount,sourceQuote,sourcePending:scope!=='at'&&ch&&!sourceQuote&&sources.sourceAnnual!=='own',fieldCount:Object.keys(EXACT_FIELDS).filter(f=>exactFieldActive(f,raw)).length+(privateHealth?1:0),supplement,atSupplement,
+  const inputs={raw:{...defaults,...original},scope,automatic,sources,ownCount,sourceQuote,sourcePending:scope!=='at'&&ch&&!sourceQuote&&sources.sourceAnnual!=='own',fieldCount:Object.keys(EXACT_FIELDS).filter(f=>exactFieldActive(f,raw)).length+(privateHealth?1:0),supplement,atSupplement,
     li:{...shared,pensionPayments:12,subsidyPayments:12,contractAnnual:annual,resident,publicLI,liMinor,ordinaryCH:resident&&raw.chTaxMode==='ordinary',taxableExtras,familyCashMonthly:n.familyCashCHF*n.fx,parkingMonthly:n.parkingCHF*n.fx,payments:Number(raw.liPayments),payrollRounding:!ch&&raw.liExact&&raw.liRounding==='nickel'?.05:.01,annualFeeKeys:raw.contributionUnit==='annual'?['nbuAnnual','ktgAnnual'].filter(k=>sources[k]==='own'):[],annual:fullAnnual,bonus:n.liBonus,fx:n.fx,nbu:MODEL.nbu,ktg:MODEL.ktg,...applied,nbuRate:sources.nbuAnnual==='own'&&raw.contributionUnit==='percent'?parseNumber(String(raw.exactNbu).replace(/%$/,'').trim(),false):MODEL.nbu,ktgRate:sources.ktgAnnual==='own'&&raw.contributionUnit==='percent'?parseNumber(String(raw.exactKtg).replace(/%$/,'').trim(),false):MODEL.ktg,healthDeductible,canton:raw.chCanton,extraCosts:n.liCosts,distance:n.liDistance,pendlerType:raw.liPp,days:Number(raw.liDays)},
-    at:{...shared,payments:Number(raw.atPayments),gross:n.atGross,period:raw.atPeriod,region:raw.atRegion,benefit:n.atBenefit,taxFree:n.atFree,companyCar:raw.atCar,extraCosts:n.atCosts,distance:n.atDistance,pendlerType:raw.atPp,days:Number(raw.atDays)}};
+    at:{...shared,employment:raw.atEmployment,payments:Number(raw.atPayments),gross:n.atGross,period:raw.atPeriod,region:raw.atRegion,benefit:n.atBenefit,taxFree:n.atFree,companyCar:raw.atCar,extraCosts:n.atCosts,distance:n.atDistance,pendlerType:raw.atPp,days:Number(raw.atDays)}};
+  inputs.notes=calculationNotes(inputs);return inputs;
 }
 function withSupplement(result,monthly){const supplement=round(monthly*12),available=round(result.available-supplement);return {...result,supplement,available,average:available/12};}
 export function calculateScenario(inputs){

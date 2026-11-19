@@ -1,5 +1,5 @@
-import { round } from './calculator.mjs?v=4.23.0';
-import { MONTHS, PAYDAY_NOTE, specialMonth, salarySchedule } from './salary-timeline.mjs?v=4.23.0';
+import { round } from './calculator.mjs?v=4.25.0';
+import { MONTHS, PAYDAY_NOTE, specialMonth, salarySchedule } from './salary-timeline.mjs?v=4.25.0';
 
 const sum=rows=>round(rows.reduce((n,r)=>n+r.available,0));
 

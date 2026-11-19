@@ -1,6 +1,6 @@
-import { round } from './calculator.mjs?v=4.23.0';
+import { round } from './calculator.mjs?v=4.25.0';
 
-import { regularLIPayroll } from './payroll.mjs?v=4.23.0';
+import { regularLIPayroll } from './payroll.mjs?v=4.25.0';
 export function liechtensteinPayslip(inputs) {
   if(inputs.raw.foreignCountry!=='li'||inputs.li.annual-inputs.li.special<=0)return null;
   return regularLIPayroll(inputs);

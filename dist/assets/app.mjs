@@ -1,22 +1,22 @@
-import { buildReport, renderReport, renderOverviewTable, renderLedgerTable, reportCsv } from './reporting.mjs?v=4.24.1';
-import { WORK_COUNTRIES, comparisonCountries, selectedCountries, switchPrimary, restoreCountryProfiles, countryInputs, calculateCountry, pairSummary, buildCountryComparison } from './country-workspace.mjs?v=4.23.0';
-import { buildComparisonTimeline } from './comparison-timeline.mjs?v=4.23.0';
-import { buildSalaryTimeline, buildAustrianTimeline, MONTHS, PAYDAY_NOTE } from './salary-timeline.mjs?v=4.23.0';
-import { OPTIONAL_FIELDS, optionalValues, hasOptionalValues, withoutOptionalValues } from './input-options.mjs?v=4.23.0';
-import { createRateController, FX_CACHE_KEY } from './exchange-rate.mjs?v=4.23.0';
-import { parseNumber } from './numbers.mjs?v=4.23.0';
-import { round, tariff } from './calculator.mjs?v=4.23.0';
-import { TAX, SOURCES } from './tax-data.mjs?v=4.23.0';
-import { MODEL, COUNTRIES, EXACT_FIELDS, PROFILE_KEYS, exactFieldMeta, exactDisplayValue, exactFieldActive, profileFrom, sanitizeProfiles, defaults, annualGross, convertGross, mergePayrollInputs, readInputs, sanitizeState, calculateScenario } from './scenario.mjs?v=4.23.0';
-import { liechtensteinPayslip, PAYSLIP_NOTE } from './payslip.mjs?v=4.23.0';
-import { CANTONS, decodeSwissTariff } from './swiss.mjs?v=4.23.0';
-import { displayPeriod, oppositePeriod } from './period.mjs?v=4.23.0';
-import { buildPaymentPlans, selectedPayment, paymentDifference, comparisonSummary, annualBudgetParts, PAYMENT_NOTE } from './payment-plan.mjs?v=4.23.0';
+import { buildReport, renderReport, renderOverviewTable, renderLedgerTable, reportCsv } from './reporting.mjs?v=4.25.0';
+import { WORK_COUNTRIES, comparisonCountries, selectedCountries, switchPrimary, restoreCountryProfiles, countryInputs, calculateCountry, pairSummary, buildCountryComparison } from './country-workspace.mjs?v=4.25.0';
+import { buildComparisonTimeline } from './comparison-timeline.mjs?v=4.25.0';
+import { buildSalaryTimeline, buildAustrianTimeline, MONTHS, PAYDAY_NOTE } from './salary-timeline.mjs?v=4.25.0';
+import { OPTIONAL_FIELDS, optionalValues, hasOptionalValues, withoutOptionalValues } from './input-options.mjs?v=4.25.0';
+import { createRateController, FX_CACHE_KEY } from './exchange-rate.mjs?v=4.25.0';
+import { parseNumber } from './numbers.mjs?v=4.25.0';
+import { round, tariff } from './calculator.mjs?v=4.25.0';
+import { taxForYear, SOURCES, SOURCES_2027 } from './tax-data.mjs?v=4.25.0';
+import { MODEL, COUNTRIES, EXACT_FIELDS, PROFILE_KEYS, exactFieldMeta, exactDisplayValue, exactFieldActive, profileFrom, sanitizeProfiles, defaults, annualGross, convertGross, mergePayrollInputs, readInputs, readSnapshotInputs, sanitizeState, calculateScenario } from './scenario.mjs?v=4.25.0';
+import { liechtensteinPayslip, PAYSLIP_NOTE } from './payslip.mjs?v=4.25.0';
+import { CANTONS, decodeSwissTariff } from './swiss.mjs?v=4.25.0';
+import { displayPeriod, oppositePeriod } from './period.mjs?v=4.25.0';
+import { buildPaymentPlans, selectedPayment, paymentDifference, comparisonSummary, annualBudgetParts, PAYMENT_NOTE } from './payment-plan.mjs?v=4.25.0';
 
-import { liFamilyEstimate, suggestedLocalPremium } from './planning.mjs';
-import { shareHash, readShareHash } from './share.mjs';
+import { liFamilyEstimate, suggestedLocalPremium } from './planning.mjs?v=4.25.0';
+import { shareHash, readShareHash } from './share.mjs?v=4.25.0';
 
-const APP_VERSION='4.24.1';
+const APP_VERSION='4.25.0';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const form=$('#calculator-form'), result=$('#result-content');
 const integer=new Intl.NumberFormat('de-AT',{maximumFractionDigits:0});
@@ -210,12 +210,45 @@ function syncInputVisibility(){
  $('#at-origin-note').textContent=compare?'Dein fertiges '+countryCode(main)+'-Budget wird aus dem Rechner übernommen.':rawState().atPayments+' Gehälter pro Jahr. ÖGK und Lohnsteuer sind in der Abrechnung enthalten.';
  $('#comparison-direction').textContent='Einzelrechnung für das gewählte Land. Deine Eingaben bleiben beim Wechsel erhalten.';
 }
+const methodText=new Map($$('[data-year-method]').map(el=>[el,el.innerHTML]));
+let displayedYear=null;
+function syncTaxYear(raw){
+ const tax=taxForYear(Number(raw.taxYear));
+ $('#at-employment-field').hidden=tax.year!==2027;
+ for(const option of $$('[data-family-2027]'))option.hidden=option.disabled=tax.year!==2027;
+ $('#family-share-hint').textContent=tax.year===2027
+  ? 'Ab 2027 gilt bei zwei Anspruchsberechtigten meist 75/25 oder 50/50. Der volle Bonus ist bei Kind unter vier Jahren, erhöhter Familienbeihilfe oder nur einem Anspruchsberechtigten möglich.'
+  : 'Den tatsächlich zustehenden Anteil wählen.';
+ $('#tax-year-hint').textContent=tax.preview?'Vorschau · offene Werte sind beim Ergebnis gekennzeichnet.':'Gilt für Rechner und Vergleich.';
+ $('#footer-version').textContent='Version '+APP_VERSION+' · Steuerjahr '+tax.year+(tax.preview?' · Vorschau':'');
+ if(displayedYear!==tax.year){
+  const sources=tax.preview?[...SOURCES_2027,...SOURCES]:SOURCES;
+  $('#sources-list').innerHTML=sources.map(s=>`<a class="source-link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer"><div><h3>${esc(s.title)}</h3><p>${esc(s.detail)}</p></div><span aria-hidden="true">↗</span></a>`).join('');
+  $('#sources-date').textContent=tax.preview?'2027 · Vorschau · geprüft am 19. November 2026':'2026 · geprüft am 25. Oktober 2026';
+  for(const [el,copy] of methodText){
+   let text=copy;
+   if(tax.preview){
+    if(el.dataset.yearMethod==='li')text=text.replace('2026:','2027 · letzter bestätigter Beitragsstand:').replace('180,50 CHF','184,00 CHF');
+    if(el.dataset.yearMethod==='ch')text=text.replace('2026:','2027 · letzter bestätigter Beitragsstand:').replace('22.680 CHF','23.040 CHF').replace('amtlichen ESTV-Lohntabellen 2026','amtlichen ESTV-Lohntabellen 2026 als ausdrücklich gekennzeichnete Übergangsschätzung für 2027');
+    if(el.dataset.yearMethod==='health')text=text.replace('565,25 EUR pro Monat (2026)','vorläufig dem zuletzt bestätigten Regelbeitrag von 565,25 EUR pro Monat (2026) für die Vorschau 2027');
+   }
+   el.innerHTML=text;
+  }
+  displayedYear=tax.year;
+ }
+}
+function yearNotice(){
+ const report=currentReport();
+ if(!report.preview)return '';
+ return `<aside class="year-notice" aria-label="Datenstand der Vorschau"><strong>Steuerjahr ${report.year} · Vorschau</strong><ul>${report.notes.map(note=>`<li>${esc(note)}</li>`).join('')}</ul></aside>`;
+}
 function syncCountryUi(){
   syncPensionPeriod();
   syncInputVisibility();
   const raw=rawState(),c=COUNTRIES[raw.foreignCountry]||COUNTRIES.li,ch=raw.foreignCountry==='ch';
+  const TAX=taxForYear(Number(raw.taxYear));syncTaxYear(raw);
   const resident=ch&&raw.chResidence==='ch',local=resident||raw.healthType==='local',priv=!local&&raw.healthType==='private';
-  $('#country-eyebrow').textContent=view==='help'?'HILFE ZUM RECHNER · STEUERJAHR 2026':view==='compare'?'VERFÜGBARES BUDGET · '+countryOrder().map(c=>countryName(c).toUpperCase()).join(' / '):atPrimary()?'WOHNEN & ARBEITEN IN ÖSTERREICH':'WOHNEN IN ÖSTERREICH · ARBEITEN '+(raw.calculatorCountry==='ch'?'IN DER SCHWEIZ':'IN LIECHTENSTEIN');
+  $('#country-eyebrow').textContent=view==='help'?'HILFE ZUM RECHNER · STEUERJAHR '+raw.taxYear:view==='compare'?'VERFÜGBARES BUDGET · '+countryOrder().map(c=>countryName(c).toUpperCase()).join(' / '):atPrimary()?'WOHNEN & ARBEITEN IN ÖSTERREICH':'WOHNEN IN ÖSTERREICH · ARBEITEN '+(raw.calculatorCountry==='ch'?'IN DER SCHWEIZ':'IN LIECHTENSTEIN');
   $('.foreign-settings').dataset.country=raw.foreignCountry;$('#settings-country-code').textContent=`${c.code} / CHF`;$('.li-inputs .country-code').textContent=`${c.code} / CHF`;
   $('label[for="li-annual"]').textContent=`${raw.foreignPeriod==='monthly'?'Monatsbrutto':'Jahresbrutto'} ${ch?'in der Schweiz':'in Liechtenstein'}`;
   syncSalaryUi(raw);
@@ -230,7 +263,7 @@ function syncCountryUi(){
   $('#health-type option[value=local]').textContent=ch?'Schweizer Grundversicherung (KVG)':'Liechtensteinische Grundversicherung (OKP)';
   $('#local-health-fields').hidden=!local;
   $('#local-health-estimate').textContent=local&&CANTONS[raw.chCanton]
-    ? 'Richtwert 2026: '+chf(suggestedLocalPremium({country:raw.foreignCountry,resident,canton:raw.chCanton,age:raw.pensionAge}))+' / Monat.'
+    ? 'Richtwert '+(raw.foreignCountry==='li'&&!['liMinor','liYouth'].includes(raw.pensionAge)?raw.taxYear:TAX.swissPremiumYear)+': '+chf(suggestedLocalPremium({country:raw.foreignCountry,resident,canton:raw.chCanton,age:raw.pensionAge,year:TAX.year}))+' / Monat.'
     : '';
   for(const el of $$('[data-li-planning]'))el.hidden=ch;
   for(const option of $('#plan-pensionAge').options)option.hidden=option.value.startsWith('li')?ch:option.value.startsWith('ch')&&!ch;
@@ -241,9 +274,9 @@ function syncCountryUi(){
   if(priv||local){$('#supplement-enabled').checked=false;$('#supplement').value='0';}
   const atAddon=raw.atSupplementEnabled;$('#at-supplement-panel').hidden=!atAddon;$('#at-supplement-panel').disabled=!atAddon;$('#at-supplement-enabled').setAttribute('aria-expanded',String(atAddon));
   const addon=!priv&&!local&&$('#supplement-enabled').checked;$('#oegk-supplement').hidden=priv||local;$('#supplement-enabled').disabled=priv||local;$('#supplement-field').hidden=!addon;$('#supplement-panel').hidden=!addon;$('#supplement').disabled=!addon;$('#supplement-enabled').setAttribute('aria-expanded',String(addon));
-  $('#fixed-contributions').innerHTML=ch?`<p>Automatische Sätze 2026</p><dl><div><dt>AHV / IV / EO</dt><dd>5,3 %</dd></div><div><dt>ALV</dt><dd>1,1 %</dd></div></dl><small>ALV bis 148.200 CHF. Kantonale Arbeitnehmerbeiträge werden zusätzlich berücksichtigt.</small>`:`<p>Automatische Sätze 2026</p><dl><div><dt>AHV / IV</dt><dd>4,7 %</dd></div><div><dt>ALV</dt><dd>0,5 %</dd></div><div><dt>FAK · Arbeitnehmer</dt><dd>0,2 %</dd></div></dl><small>AHV 4,025 % + IV 0,675 %. ALV bis 126.000 CHF. FAK-Beitrag Arbeitgeber: 1,9 % – kein Abzug von deinem Netto.</small>`;
+  $('#fixed-contributions').innerHTML=ch?`<p>Sätze für ${TAX.year}${TAX.preview?' · letzter bestätigter Stand':''}</p><dl><div><dt>AHV / IV / EO</dt><dd>5,3 %</dd></div><div><dt>ALV</dt><dd>1,1 %</dd></div></dl><small>ALV bis 148.200 CHF. Kantonale Arbeitnehmerbeiträge werden zusätzlich berücksichtigt.</small>`:`<p>Sätze für ${TAX.year}${TAX.preview?' · letzter bestätigter Stand':''}</p><dl><div><dt>AHV / IV</dt><dd>4,7 %</dd></div><div><dt>ALV</dt><dd>0,5 %</dd></div><div><dt>FAK · Arbeitnehmer</dt><dd>0,2 %</dd></div></dl><small>AHV 4,025 % + IV 0,675 %. ALV bis 126.000 CHF. FAK-Beitrag Arbeitgeber: 1,9 % – kein Abzug von deinem Netto.</small>`;
   $('.li-rounding-field').hidden=ch;$('#li-rounding').disabled=ch||!raw.liExact;
-  $('#insurance-hint').textContent=local?'Die Grundprämie im Arbeitsland wird separat vom Lohn berücksichtigt.':priv?'Private Grenzgänger-Grundversicherung statt ÖGK. Gleichwertigkeit und Befreiung im Arbeitsland müssen anerkannt sein.':'ÖGK-Regelbeitrag 2026: 565,25 EUR pro Monat. Bekannte Herabsetzung im Lohnzettelmodus eintragbar.';syncDisclosureIcons();
+  $('#insurance-hint').textContent=local?'Die Grundprämie im Arbeitsland wird separat vom Lohn berücksichtigt.':priv?'Private Grenzgänger-Grundversicherung statt ÖGK. Gleichwertigkeit und Befreiung im Arbeitsland müssen anerkannt sein.':'ÖGK-Regelbeitrag '+TAX.healthYear+': '+eur(TAX.healthMonthly)+' pro Monat.'+(TAX.preview?' Für die Vorschau 2027 als Übergangswert angesetzt.':'')+' Bekannten eigenen Beitrag im Lohnzettelmodus eintragen.';syncDisclosureIcons();
 }
 const formatExact=(value,meta)=>meta.percent?value.toLocaleString('de-AT',{maximumFractionDigits:8}):amount(value);
 function syncExactMode(inputs){
@@ -287,7 +320,7 @@ function convertContributionUnit(){
 function contributionLines(v=payment('foreign')){
   const c=v.contributions,ch=last.li.kind==='ch',pct=n=>n.toLocaleString('de-AT',{maximumFractionDigits:8})+' %';
   const feeLabel=field=>{const meta=exactFieldMeta(field,last.inputs.raw);return `${meta.label} · ${meta.percent?pct(exactDisplayValue(last.inputs,field))+' · ':''}${sourceWord(meta.key)}`;};
-  return [[ch?'AHV / IV / EO · 5,3 %':'AHV / IV · 4,7 %',c.ahv+c.iv+(c.eo||0)],...(!ch?[['FAK · Arbeitnehmer · 0,2 %',c.fak]]:[]),[ch?'ALV · 1,1 %':'ALV · 0,5 %',c.alv],...(ch?[[`Kantonale Beiträge · ${pct((TAX.chRegional[last.inputs.raw.chCanton]||0)*100)}`,c.regional],['Weitere Pflichtabgaben',c.other]]:[]),[feeLabel('exactNbu'),c.nbu],[feeLabel('exactKtg'),c.ktg],[`PK-Beitrag · ${sourceWord('pension')}`,c.pension]];
+  return [[ch?'AHV / IV / EO · 5,3 %':'AHV / IV · 4,7 %',c.ahv+c.iv+(c.eo||0)],...(!ch?[['FAK · Arbeitnehmer · 0,2 %',c.fak]]:[]),[ch?'ALV · 1,1 %':'ALV · 0,5 %',c.alv],...(ch?[[`Kantonale Beiträge · ${pct((taxForYear(last.inputs.li.year).chRegional[last.inputs.raw.chCanton]||0)*100)}`,c.regional],['Weitere Pflichtabgaben',c.other]]:[]),[feeLabel('exactNbu'),c.nbu],[feeLabel('exactKtg'),c.ktg],[`PK-Beitrag · ${sourceWord('pension')}`,c.pension]];
 }
 function detailRows(){return contributionLines().map(([label,value])=>`<tr><td>${label}</td><td>${chf(value)}</td></tr>`).join('');}
 function extraRecords(plan){return [...plan.extras,...(plan.settlement&&['salaryGross','subsidy','social','tax','health','supplement','extraCosts','available'].some(k=>Math.abs(plan.settlement[k]||0)>=.005)?[plan.settlement]:[])];}
@@ -395,10 +428,10 @@ function renderCalculator(){
 function compareHeaders(){return `<tr><th>Position</th><th>${foreignName()} · CHF<br>${foreignPeriod().column}</th><th>Österreich · EUR<br>${atDisplayPeriod().column}</th></tr>`;}
 function nativeComparisonLines(f=payment('foreign'),a=payment('at')){return [['Bruttogehalt',f.grossCHF,a.salaryGross],...(last.li.kind==='li'?[['Arbeitgeber-KK-Beitrag',f.subsidyCHF,0]]:[]),['Sozialversicherung & PK',-f.socialCHF,-a.social],[`Quellensteuer ${foreignCode()} / Lohnsteuer AT`,-f.sourceCHF,-a.tax],['Auszahlung vom Arbeitgeber',f.payoutCHF,a.payout]];}
 function compareRows(){const rows=nativeComparisonLines();return rows.map(([label,x,y],i)=>`<tr class="${i===rows.length-1?'total':''}"><td>${label}</td><td>${chf(x)}</td><td>${eur(y)}</td></tr>`).join('');}
-function atDetail(){const p=atDisplayPeriod(),a=last.at,v=payment('at'),monthly=p.code==='monthly',n=monthly?1:12;
- const taxBase=round(a.taxable/12),c=a.credits,pp=a.pp,annualTariff=round(tariff(a.taxable)),credit=c.family+c.traffic+c.avab+pp.euro;
+function atDetail(){const TAX=taxForYear(last.inputs.at.year);const p=atDisplayPeriod(),a=last.at,v=payment('at'),monthly=p.code==='monthly',n=monthly?1:12;
+ const taxBase=round(a.taxable/12),c=a.credits,pp=a.pp,annualTariff=round(tariff(a.taxable,a.year)),credit=c.family+c.traffic+c.avab+pp.euro;
  const rows=[['Brutto inkl. Sachbezug',round((a.monthlyGross+last.inputs.at.benefit)*n)],['Laufende Sozialversicherung',-round(a.monthlySV*n)],['Freibetrag',-round(last.inputs.at.taxFree*n)],['Werbungskostenpauschale',-round(TAX.credits.expenses*n/12)],['Pendlerpauschale',-round(pp.allowance*n/12)],['Steuerpflichtiger laufender Bezug',monthly?taxBase:a.taxable]];
- return `<details class="result-details at-detail"><summary>Österreich: Steuerinfos & Rechenweg · ${p.label}<span aria-hidden="true">+</span></summary><div class="details-body"><details class="result-details"><summary>So entsteht die laufende Lohnsteuer<span aria-hidden="true">+</span></summary><div class="details-body"><table><tbody>${rows.map(([label,value])=>periodRow(label,value)).join('')}</tbody></table>${a.assessmentRelief?`<p class="table-note">Geschätzte Entlastung aus der Veranlagung: ${eur(a.assessmentRelief)} / Jahr. Sie ist im Jahresbudget enthalten.</p>`:''}<p class="table-note">Die Tarifsteuer wird aus der jährlichen Bemessungsgrundlage von ${eur(a.taxable)} berechnet: ${eur(annualTariff)} Tarifsteuer − ${eur(credit)} Absetzbeträge und Pendlereuro. Nach Begrenzung auf mindestens 0 und Division durch zwölf: ${eur(a.monthlyTax)} Lohnsteuer im normalen Monat. Gerundete Monatswerte können Cent-Differenzen zur Jahresbasis ergeben.</p><table><thead><tr><th>Jährlicher Einkommensteil 2026</th><th>Steuersatz</th></tr></thead><tbody>${TAX.brackets.map(([limit,rate],i)=>`<tr><td>${Number.isFinite(limit)?(i?'Über '+whole(TAX.brackets[i-1][0])+' bis ':'Bis ')+whole(limit)+' EUR':'Über '+whole(TAX.brackets[i-1][0])+' EUR'}</td><td>${whole(rate*100)} %</td></tr>`).join('')}</tbody></table></div></details><details class="result-details"><summary>Sozialversicherung & Sonderzahlungen<span aria-hidden="true">+</span></summary><div class="details-body"><p class="table-note">ÖGK-Krankenversicherung 3,87 %, Pension 10,25 %, Arbeitslosenversicherung einkommensabhängig bis 2,95 %, AK-Umlage 0,5 % und Wohnbauförderung ${last.inputs.at.region==='wien'?'0,75':'0,5'} %. Laufende Beitragsgrenze 6.930 EUR pro Monat; Sonderzahlungen gemeinsam bis 13.860 EUR pro Jahr. Die ÖGK ist bereits enthalten.</p><table><thead><tr><th>Bezug</th><th>Brutto EUR</th><th>SV EUR</th><th>Lohnsteuer EUR</th><th>Auszahlung EUR</th></tr></thead><tbody>${[last.plans.at.regular,...last.plans.at.extras].map(r=>`<tr><td>${r.label}</td><td>${eur(r.salaryGross)}</td><td>${eur(r.social)}</td><td>${eur(r.tax)}</td><td>${eur(r.payout)}</td></tr>`).join('')}</tbody></table><p class="table-note">${a.payments===12?'Zwölf laufende Bezüge ohne Sonderzahlungen.':'Zwölf laufende Bezüge, 13. und 14. Gehalt separat.'} Im Jahressechstel gelten für Sonderzahlungen ein Freibetrag von 620 EUR und danach gestaffelte Sätze (zunächst 6 %); Grenzen und Freigrenze werden berücksichtigt. Keine AK-Umlage oder Wohnbauförderung auf Sonderzahlungen. Zusatzversicherung und eigene Kosten werden zwölfmal vom laufenden Bezug abgezogen.</p></div></details><button class="text-button" data-view="method">Modellannahmen & amtliche Quellen ↗</button></div></details>`;
+ return `<details class="result-details at-detail"><summary>Österreich: Steuerinfos & Rechenweg · ${p.label}<span aria-hidden="true">+</span></summary><div class="details-body"><details class="result-details"><summary>So entsteht die laufende Lohnsteuer<span aria-hidden="true">+</span></summary><div class="details-body"><table><tbody>${rows.map(([label,value])=>periodRow(label,value)).join('')}</tbody></table>${a.assessmentRelief?`<p class="table-note">Geschätzte Entlastung aus der Veranlagung: ${eur(a.assessmentRelief)} / Jahr. Sie ist im Jahresbudget enthalten.</p>`:''}<p class="table-note">Die Tarifsteuer wird aus der jährlichen Bemessungsgrundlage von ${eur(a.taxable)} berechnet: ${eur(annualTariff)} Tarifsteuer − ${eur(credit)} Absetzbeträge und Pendlereuro. Nach Begrenzung auf mindestens 0 und Division durch zwölf: ${eur(a.monthlyTax)} Lohnsteuer im normalen Monat. Gerundete Monatswerte können Cent-Differenzen zur Jahresbasis ergeben.</p><table><thead><tr><th>Jährlicher Einkommensteil ${TAX.year}</th><th>Steuersatz</th></tr></thead><tbody>${TAX.brackets.map(([limit,rate],i)=>`<tr><td>${Number.isFinite(limit)?(i?'Über '+whole(TAX.brackets[i-1][0])+' bis ':'Bis ')+whole(limit)+' EUR':'Über '+whole(TAX.brackets[i-1][0])+' EUR'}</td><td>${whole(rate*100)} %</td></tr>`).join('')}</tbody></table></div></details><details class="result-details"><summary>Sozialversicherung & Sonderzahlungen<span aria-hidden="true">+</span></summary><div class="details-body"><p class="table-note">ÖGK-Krankenversicherung 3,87 %, Pension 10,25 %, Arbeitslosenversicherung einkommensabhängig bis 2,95 %, AK-Umlage 0,5 % und Wohnbauförderung ${last.inputs.at.region==='wien'?'0,75':'0,5'} %. Laufende Beitragsgrenze ${whole(TAX.employee.monthlyCap)} EUR pro Monat; Sonderzahlungen gemeinsam bis ${whole(TAX.employee.specialCap)} EUR pro Jahr.${TAX.preview?' Vorläufige ÖGK-Werte 2027. ALV-Staffel für '+(last.inputs.at.employment==='new'?'ab 2027 beginnende':'am 31.12.2026 bestehende')+' Dienstverhältnisse.':''} Die ÖGK ist bereits enthalten.</p><table><thead><tr><th>Bezug</th><th>Brutto EUR</th><th>SV EUR</th><th>Lohnsteuer EUR</th><th>Auszahlung EUR</th></tr></thead><tbody>${[last.plans.at.regular,...last.plans.at.extras].map(r=>`<tr><td>${r.label}</td><td>${eur(r.salaryGross)}</td><td>${eur(r.social)}</td><td>${eur(r.tax)}</td><td>${eur(r.payout)}</td></tr>`).join('')}</tbody></table><p class="table-note">${a.payments===12?'Zwölf laufende Bezüge ohne Sonderzahlungen.':'Zwölf laufende Bezüge, 13. und 14. Gehalt separat.'} Im Jahressechstel gelten für Sonderzahlungen ein Freibetrag von 620 EUR und danach gestaffelte Sätze (zunächst 6 %); Grenzen und Freigrenze werden berücksichtigt. Keine AK-Umlage oder Wohnbauförderung auf Sonderzahlungen. Zusatzversicherung und eigene Kosten werden zwölfmal vom laufenden Bezug abgezogen.</p></div></details><button class="text-button" data-view="method">Modellannahmen & amtliche Quellen ↗</button></div></details>`;
 }
 function comparisonRows(){const c=pairSummary(last.byCountry[countryOrder()[0]],last.byCountry[countryOrder()[1]],comparisonPeriod),values=c.values,order=countryOrder();return [[countryName(order[0]),values[order[0]]],[countryName(order[1]),values[order[1]]],[`${countryCode(order[0])} minus ${countryCode(order[1])}`,round(values[order[0]]-values[order[1]])]];}
 function displayBudget(value, rate = parseNumber(rawState().fx,false)){
@@ -500,7 +533,7 @@ function renderCompare(){
  </div>`;
 }
 function inputSummary(){
- const rows=[['Rechnerland',primaryName()],...(view==='compare'?[['Vergleichsland',countryName(rawState().comparisonCountry)]]:[]),['Steuerjahr','2026'],['Anzeige','Normaler Monat; zusätzliche Gehälter separat']];
+ const rows=[['Rechnerland',primaryName()],...(view==='compare'?[['Vergleichsland',countryName(rawState().comparisonCountry)]]:[]),['Steuerjahr',rawState().taxYear],['Anzeige','Normaler Monat; zusätzliche Gehälter separat']];
  for(const country of view==='compare'?countryOrder():[rawState().calculatorCountry]){
   const job=last.byCountry[country],{raw,li,at}=job.inputs,code=countryCode(country);
   if(country==='at')rows.push([code+' Bruttoeingabe',`${raw.atGross} EUR / ${raw.atPeriod==='monthly'?'Monat × '+raw.atPayments:'Jahr'}`],[code+' Bundesland',raw.atRegion],[code+' Grundversicherung','ÖGK in Sozialversicherung enthalten'],[code+' Zusatzversicherung',eur(job.inputs.atSupplement)+' / Monat'],[code+' eigene Kosten',eur(at.extraCosts)+' / Monat']);
@@ -586,7 +619,7 @@ function update(){syncCountryUi();syncExactMode();syncInputOptions();try{
   }catch(error){thirdError=error.message;}
  }
  last={...jobContext(main),byCountry:jobs,thirdError,comparisonTimeline:view==='compare'?buildCountryComparison(main,jobs[raw.comparisonCountry]):null};
- $('#monthly-preview').textContent=edit&&edit.country!=='at'?eur(edit.plan.regular.available):'—';$('#at-monthly-preview').textContent=edit?.country==='at'?eur(edit.plan.regular.available):'—';$('#validation').hidden=true;$('#validation').textContent='';result.classList.remove('stale-results');renderResult(view==='compare'?renderCompare():renderCalculator());updatePrint();persist();
+ $('#monthly-preview').textContent=edit&&edit.country!=='at'?eur(edit.plan.regular.available):'—';$('#at-monthly-preview').textContent=edit?.country==='at'?eur(edit.plan.regular.available):'—';$('#validation').hidden=true;$('#validation').textContent='';result.classList.remove('stale-results');renderResult(yearNotice()+(view==='compare'?renderCompare():renderCalculator()));updatePrint();persist();
 }catch(error){last=null;$('#monthly-preview').textContent='Angaben ergänzen';$('#at-monthly-preview').textContent='Angaben ergänzen';$('#validation').textContent=error.message;$('#validation').hidden=false;result.classList.remove('stale-results');result.innerHTML='<div class="results-empty"><h2>Ergänze deine Angaben.</h2><p>Nach der Korrektur wird das Budget automatisch neu berechnet.</p></div>';updatePrint();}
  finally{syncHeroBudget();}
 }
@@ -608,7 +641,7 @@ function changeView(next,scroll=false){
 }
 function exportFilename(extension,full=reportDetail==='detailed'){
  const keys=last?reportCountries():[rawState().calculatorCountry];
- return `grenzgehalt-${keys.join('-')}-${full?'vollberechnung':'kompakt'}-${new Date().toISOString().slice(0,10)}.${extension}`;
+ return `grenzgehalt-${rawState().taxYear}${taxForYear(Number(rawState().taxYear)).preview?'-vorschau':''}-${keys.join('-')}-${full?'vollberechnung':'kompakt'}-${new Date().toISOString().slice(0,10)}.${extension}`;
 }
 let printPageTitle=null;
 function preparePrint(){
@@ -779,7 +812,7 @@ function exportData(type){
  update();if(!last){toast('Bitte zuerst gültige Gehaltsangaben eintragen.');return;}
  const raw=rawState(),keys=reportCountries();
  if(type==='json'){
-  const payload={schema:'grenzgehalt/4',version:APP_VERSION,model:MODEL.version,year:2026,resultCurrency,threeWay,sameGross,createdAt:new Date().toISOString(),approximate:true,example,view:view==='compare'?'compare':'calculator',country:raw.calculatorCountry,comparisonCountry:raw.comparisonCountry,inputs:raw,countryProfiles:savedProfiles(),exchangeRate:rateController.metadata(),comparisonPeriod,selectedPayMonth,headline:{basis:'regular_month',country:raw.calculatorCountry,currency:'EUR',available:last.byCountry[raw.calculatorCountry].plan.regular.available},payment_plans:Object.fromEntries(keys.map(c=>[c,last.byCountry[c].plan])),monthly_timeline:last.timeline,country_timelines:Object.fromEntries(keys.map(c=>[c,last.byCountry[c].timeline])),comparison_timeline:last.comparisonTimeline,comparison:view==='compare'?pairSummary(last.byCountry[keys[0]],last.byCountry[keys[1]],comparisonPeriod):null,display:Object.fromEntries(keys.map(c=>[c,{...jobPeriod(c),currency:WORK_COUNTRIES[c].currency,values:selectedPayment(last.byCountry[c].plan,jobPeriod(c).code)}])),annual_budget_parts:Object.fromEntries(keys.map(c=>[c,annualBudgetParts(last.byCountry[c].plan)])),country_calculations:Object.fromEntries(keys.map(c=>[c,{applied:last.byCountry[c].inputs,result:last.byCountry[c].result}])),cash_conversion:'Jede CHF-Abrechnung zuerst; fertige Arbeitgeberauszahlung einmal in EUR. Österreich bleibt in EUR. Der Vergleich übernimmt fertige Budgets.',payment_note:PAYMENT_NOTE};
+  const payload={schema:'grenzgehalt/4',version:APP_VERSION,model:MODEL.version,year:Number(rawState().taxYear),resultCurrency,threeWay,sameGross,createdAt:new Date().toISOString(),approximate:true,dataStatus:{preview:currentReport().preview,notes:currentReport().notes},example,view:view==='compare'?'compare':'calculator',country:raw.calculatorCountry,comparisonCountry:raw.comparisonCountry,inputs:raw,countryProfiles:savedProfiles(),exchangeRate:rateController.metadata(),comparisonPeriod,selectedPayMonth,headline:{basis:'regular_month',country:raw.calculatorCountry,currency:'EUR',available:last.byCountry[raw.calculatorCountry].plan.regular.available},payment_plans:Object.fromEntries(keys.map(c=>[c,last.byCountry[c].plan])),monthly_timeline:last.timeline,country_timelines:Object.fromEntries(keys.map(c=>[c,last.byCountry[c].timeline])),comparison_timeline:last.comparisonTimeline,comparison:view==='compare'?pairSummary(last.byCountry[keys[0]],last.byCountry[keys[1]],comparisonPeriod):null,display:Object.fromEntries(keys.map(c=>[c,{...jobPeriod(c),currency:WORK_COUNTRIES[c].currency,values:selectedPayment(last.byCountry[c].plan,jobPeriod(c).code)}])),annual_budget_parts:Object.fromEntries(keys.map(c=>[c,annualBudgetParts(last.byCountry[c].plan)])),country_calculations:Object.fromEntries(keys.map(c=>[c,{applied:last.byCountry[c].inputs,result:last.byCountry[c].result}])),cash_conversion:'Jede CHF-Abrechnung zuerst; fertige Arbeitgeberauszahlung einmal in EUR. Österreich bleibt in EUR. Der Vergleich übernimmt fertige Budgets.',payment_note:PAYMENT_NOTE};
   download(new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}),exportFilename('json',true));toast('Vollberechnung als JSON gespeichert.');return;
  }
  const csv=reportCsv(currentReport(),{detailed:reportDetail==='detailed'});
@@ -789,14 +822,13 @@ function exportData(type){
 function closeMenu(){$('#export-menu').hidden=true;$('#export-toggle').setAttribute('aria-expanded','false');}
 function scenarioSnapshot(){
  return {
-  schema:'grenzgehalt/4',model:MODEL.version,year:2026,view:view==='compare'?'compare':'calculator',
+  schema:'grenzgehalt/4',model:MODEL.version,year:Number(rawState().taxYear),view:view==='compare'?'compare':'calculator',
   inputs:rawState(),countryProfiles:savedProfiles(),comparisonPeriod,selectedPayMonth,
   resultCurrency,threeWay,sameGross,example,exchangeRate:rateController.metadata(),
  };
 }
 function applySnapshot(data){
- if(data?.schema!=='grenzgehalt/4'||data.year!==2026)throw new Error('Bitte eine Grenzgehalt-4-Berechnung für 2026 wählen.');
- const safe=sanitizeState(data.inputs,{legacy:data.model!==MODEL.version});
+ const safe=readSnapshotInputs(data);
  const profiles=restoreCountryProfiles(safe,data.countryProfiles);
  comparisonPeriod=data.comparisonPeriod==='annual'?'annual':'monthly';
  selectedPayMonth=Number.isInteger(data.selectedPayMonth)&&data.selectedPayMonth>=0&&data.selectedPayMonth<12?data.selectedPayMonth:0;
@@ -957,7 +989,7 @@ result.addEventListener('click',event=>{
  field.click();
  $(country==='at'?'#at-gross':'#li-annual').focus();
 });
-function exampleState(){const country=rawState().foreignCountry,calculatorCountry=rawState().calculatorCountry;applyState({...defaults,calculatorCountry,foreignCountry:country});previousCountry=country;example=true;rateController.restore({source:'example',automatic:true});restoreInputOptions();update();void rateController.setAutomatic(true);toast('Fiktive Beispielrechnung geladen.');}
+function exampleState(){const country=rawState().foreignCountry,calculatorCountry=rawState().calculatorCountry;applyState({...defaults,taxYear:rawState().taxYear,calculatorCountry,foreignCountry:country});previousCountry=country;example=true;rateController.restore({source:'example',automatic:true});restoreInputOptions();update();void rateController.setAutomatic(true);toast('Fiktive Beispielrechnung geladen.');}
 document.addEventListener('change',event=>{if(event.target.name==='comparisonPeriod'&&['monthly','annual'].includes(event.target.value)){comparisonPeriod=event.target.value;update();result.querySelector('[name="comparisonPeriod"]:checked')?.focus({preventScroll:true});}});
 document.addEventListener('click',event=>{const monthButton=event.target.closest('[data-pay-month]');if(monthButton&&last){selectedPayMonth=Number(monthButton.dataset.payMonth);for(const button of $$('[data-pay-month]')){const selected=Number(button.dataset.payMonth)===selectedPayMonth;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));}$('#payday-detail').innerHTML=view==='compare'?comparisonMonthDetail():timelineMonthDetail();syncDisclosureIcons($('#payday-detail'));persist();}const nav=event.target.closest('[data-view]');if(nav){event.preventDefault();changeView(nav.dataset.view,true);}if(event.target.closest('[data-result]')){update();$('#results-panel').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});}if(event.target.closest('[data-example]'))exampleState();if(event.target.closest('[data-reset-special]')){form.elements.specialOverride.checked=false;form.elements.exactSpecial.value='';example=false;update();toast('Sonderzahlungen werden wieder aus der Gehaltsanzahl berechnet.');}if(event.target.closest('[data-retry-swiss]')){for(const canton of [...swissCache.keys()])if(swissCache.get(canton)?.error)swissCache.delete(canton);update();}if(!event.target.closest('.export-wrap'))closeMenu();});
 $('#export-toggle').addEventListener('click',()=>{const open=$('#export-menu').hidden;$('#export-menu').hidden=!open;$('#export-toggle').setAttribute('aria-expanded',String(open));if(open)$('#report-detail').focus();});
@@ -971,21 +1003,21 @@ $('#import-file').addEventListener('change',async event=>{const file=event.targe
   if(file.size>200000)throw new Error('Die JSON-Datei ist zu groß (maximal 200 KB).');
   const data=JSON.parse(await file.text());
   if(data.schema==='grenzgehalt/payroll/1'){
-    if(data.year!==2026||data.country!=='li')throw new Error('Die Lohnzetteldatei muss für Liechtenstein 2026 sein.');
-    const current=rawState(),profiles=savedProfiles(),base={...current,...(current.foreignCountry==='li'?{}:profiles.li||profileFrom(defaults)),foreignCountry:'li'},safe=mergePayrollInputs({...base,calculatorCountry:'li'},data.inputs),candidate=readInputs(safe);
+    if(![2026,2027].includes(data.year)||data.country!=='li')throw new Error('Die Lohnzetteldatei muss für Liechtenstein 2026 oder 2027 sein.');
+    const current=rawState(),profiles=savedProfiles(),base={...current,taxYear:String(data.year),...(current.foreignCountry==='li'?{}:profiles.li||profileFrom(defaults)),foreignCountry:'li'},safe=mergePayrollInputs({...base,calculatorCountry:'li'},data.inputs),candidate=readInputs(safe);
     calculateScenario(candidate);countryProfiles=profiles;applyState(safe);previousCountry='li';example=false;changeView('calculator');toast('Lohnzetteldaten übernommen. Versicherung, Kosten, Österreich und Wechselkurs bleiben erhalten.');return;
   }
-  if(data.schema!=='grenzgehalt/4'||data.year!==2026)throw new Error('Bitte eine Grenzgehalt-4-Berechnung für 2026 wählen.');
-  const legacy=data.model!==MODEL.version,safe=sanitizeState(data.inputs,{legacy});const profiles=restoreCountryProfiles(safe,data.countryProfiles);for(const country of data.view==='compare'?[safe.calculatorCountry,safe.comparisonCountry]:[safe.calculatorCountry]){const source=countryInputs(safe,profiles,country),tariff=country==='ch'?await ensureSwissTariff(source.chCanton):null;calculateCountry(safe,profiles,country,{swissData:tariff});}
+  const legacy=data.model!==MODEL.version,safe=readSnapshotInputs(data);const profiles=restoreCountryProfiles(safe,data.countryProfiles);for(const country of data.view==='compare'?[safe.calculatorCountry,safe.comparisonCountry]:[safe.calculatorCountry]){const source=countryInputs(safe,profiles,country),tariff=country==='ch'?await ensureSwissTariff(source.chCanton):null;calculateCountry(safe,profiles,country,{swissData:tariff});}
   applySnapshot({...data,inputs:safe,countryProfiles:profiles});
   toast(legacy?'Ältere Berechnung geladen. Eingaben und Einheiten wurden übernommen; PK und LI-KK werden zwölfmal pro Jahr berücksichtigt.':'Berechnung geladen und neu berechnet.');
 }catch(error){toast(error instanceof SyntaxError?'Die Datei ist kein gültiges JSON.':error.message);}finally{event.target.value='';}});
+$('#tax-year').addEventListener('change',()=>{if(rawState().taxYear==='2026'&&['0.25','0.75'].includes(form.elements.familyShare.value))form.elements.familyShare.value='0.5';example=false;update();toast('Steuerjahr geändert. Eigene Lohnzettelwerte und Prämien bitte für das gewählte Jahr prüfen.');});
 form.addEventListener('submit',event=>event.preventDefault());
 form.addEventListener('input',event=>{if(['calculatorCountry','comparisonCountry'].includes(event.target.name)||event.target.dataset.inputOption||['remember','fx-auto'].includes(event.target.id))return;example=false;if(['foreignPeriod','atPeriod'].includes(event.target.name))convertSalaryPeriod(event.target.name);if(event.target.name==='contributionUnit')convertContributionUnit();if(event.target.name==='fx'){rateController.manualEdit();return;}update();});
 form.addEventListener('change',event=>{if(['calculatorCountry','comparisonCountry'].includes(event.target.name))return;if(event.target.dataset.inputOption){toggleInputOption(event.target);return;}if(['remember','fx-auto'].includes(event.target.id))return;example=false;if(['foreignPeriod','atPeriod'].includes(event.target.name))convertSalaryPeriod(event.target.name);if(event.target.name==='contributionUnit')convertContributionUnit();update();});
 $('#remember').addEventListener('change',event=>{try{if(event.target.checked){update();persist();toast('Angaben werden auf diesem Gerät gespeichert.');}else{localStorage.removeItem(storageKey);toast('Gespeicherte Angaben wurden entfernt.');}}catch{event.target.checked=false;toast('Lokale Speicherung wird nicht unterstützt.');}});
 $('#example-button').addEventListener('click',exampleState);
-$('#clear-button').addEventListener('click',()=>{const country=rawState().foreignCountry,calculatorCountry=rawState().calculatorCountry;applyState({...defaults,calculatorCountry,foreignCountry:country,liAnnual:'',liBonus:'0',atGross:'0'});countryProfiles={};previousCountry=country;example=false;try{localStorage.removeItem(storageKey);}catch{}$('#remember').checked=false;rateController.restore({source:'example',automatic:true});restoreInputOptions();update();void rateController.setAutomatic(true);$(atPrimary()?'#at-gross':'#li-annual').focus();toast('Angaben zurückgesetzt.');});
+$('#clear-button').addEventListener('click',()=>{const country=rawState().foreignCountry,calculatorCountry=rawState().calculatorCountry;applyState({...defaults,taxYear:rawState().taxYear,calculatorCountry,foreignCountry:country,liAnnual:'',liBonus:'0',atGross:'0'});countryProfiles={};previousCountry=country;example=false;try{localStorage.removeItem(storageKey);}catch{}$('#remember').checked=false;rateController.restore({source:'example',automatic:true});restoreInputOptions();update();void rateController.setAutomatic(true);$(atPrimary()?'#at-gross':'#li-annual').focus();toast('Angaben zurückgesetzt.');});
 const textSizeKey='grenzgehalt.textSize';
 function setTextSize(value){
  const size=['100','115','130','150'].includes(value)?value:'100';
@@ -1005,7 +1037,7 @@ $$('input[name=calculatorCountry]').forEach(el=>el.addEventListener('change',()=
 $$('input[name=comparisonCountry]').forEach(el=>el.addEventListener('change',()=>{saveEditor();switchEditor(editorCountry());example=false;update();}));
 
 let savedFx=null;applyState(defaults);
-try{const saved=localStorage.getItem(storageKey);if(saved){const data=JSON.parse(saved);if(data.schema==='grenzgehalt/4'&&data.year===2026){const legacy=data.model!==MODEL.version;comparisonPeriod=['monthly','annual'].includes(data.comparisonPeriod)?data.comparisonPeriod:'monthly';selectedPayMonth=Number.isInteger(data.selectedPayMonth)&&data.selectedPayMonth>=0&&data.selectedPayMonth<12?data.selectedPayMonth:0;resultCurrency=data.resultCurrency==='CHF'?'CHF':'EUR';threeWay=data.threeWay===true;sameGross=data.sameGross===true;applyState(sanitizeState(data.inputs,{legacy}));countryProfiles=restoreCountryProfiles(rawState(),data.countryProfiles);previousCountry=rawState().foreignCountry;example=data.example===true;savedFx=data.exchangeRate||{source:'manual',automatic:false};$('#remember').checked=true;if(legacy)toast('Gespeicherte Eingaben geladen. PK und LI-KK werden zwölfmal pro Jahr berücksichtigt.');}}}catch{toast('Gespeicherte Angaben konnten nicht geladen werden. Die Beispielwerte sind aktiv.');}
+try{const saved=localStorage.getItem(storageKey);if(saved){const data=JSON.parse(saved);if(data.schema==='grenzgehalt/4'&&[2026,2027].includes(data.year)){const legacy=data.model!==MODEL.version;comparisonPeriod=['monthly','annual'].includes(data.comparisonPeriod)?data.comparisonPeriod:'monthly';selectedPayMonth=Number.isInteger(data.selectedPayMonth)&&data.selectedPayMonth>=0&&data.selectedPayMonth<12?data.selectedPayMonth:0;resultCurrency=data.resultCurrency==='CHF'?'CHF':'EUR';threeWay=data.threeWay===true;sameGross=data.sameGross===true;applyState(readSnapshotInputs(data));countryProfiles=restoreCountryProfiles(rawState(),data.countryProfiles);previousCountry=rawState().foreignCountry;example=data.example===true;savedFx=data.exchangeRate||{source:'manual',automatic:false};$('#remember').checked=true;if(legacy)toast('Gespeicherte Berechnung für '+data.year+' geladen und mit dem aktuellen Datenstand berechnet.');}}}catch{toast('Gespeicherte Angaben konnten nicht geladen werden. Die Beispielwerte sind aktiv.');}
 if(savedFx)rateController.restore(savedFx);
 renderFxStatus(rateController.state);fxReady=true;
 function openHash(){

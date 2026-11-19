@@ -1,5 +1,5 @@
-import { defaults } from './scenario.mjs?v=4.23.0';
-import { parseNumber } from './numbers.mjs?v=4.23.0';
+import { defaults } from './scenario.mjs?v=4.25.0';
+import { parseNumber } from './numbers.mjs?v=4.25.0';
 
 // Presentation groups reuse the existing inputs and their neutral values.
 // No separate salary, tax or contribution calculation is introduced here.

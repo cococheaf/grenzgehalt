@@ -1,3 +1,5 @@
+import { taxForYear } from './tax-data.mjs?v=4.25.0';
+
 // Optional planning parameters leave earlier saved scenarios on their original model.
 export const planningDefaults = Object.freeze({
   atPayments: '14',
@@ -31,7 +33,9 @@ const swissPremiums = {
   TI:[582.3,404.2], UR:[361.6,231.5], VD:[526.6,371.1], VS:[436.1,295.7],
   ZG:[311.2,226.8], ZH:[451.3,317.2],
 };
-export function suggestedLocalPremium({country, resident, canton, age}) {
+export function suggestedLocalPremium({country, resident, canton, age, year=2026}) {
+  taxForYear(year);
+  if(country==='li'&&year===2027&&!(['liMinor','liYouth'].includes(age)))return 394.51;
   if (country === 'li') return ['liMinor','liYouth'].includes(age) ? 197.07 : 385.70;
   const young = age === 'chUnder25';
   if (resident) return swissPremiums[canton][young ? 1 : 0];
@@ -39,10 +43,11 @@ export function suggestedLocalPremium({country, resident, canton, age}) {
   return young ? 429.20 : 447.40;
 }
 
-export function estimatedSwissPension(annual, age) {
+export function estimatedSwissPension(annual, age, year=2026) {
+  const limits=taxForYear(year).swissPension;
   const savingsRates = {chUnder25:0, ch25:0.07, ch35:0.10, ch45:0.15, ch55:0.18};
-  if (!(age in savingsRates) || annual <= 22680) return 0;
-  const coordinated = Math.max(3780, Math.min(annual, 90720) - 26460);
+  if (!(age in savingsRates) || annual <= limits.entry) return 0;
+  const coordinated = Math.max(limits.minimum, Math.min(annual, limits.maximum) - limits.coordination);
   return Math.round(coordinated * savingsRates[age] * 50) / 100;
 }
 

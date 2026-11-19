@@ -1,4 +1,4 @@
-import { round } from './calculator.mjs?v=4.23.0';
+import { round } from './calculator.mjs?v=4.25.0';
 
 export const MONTHS=Object.freeze([
  ['Jänner','Jän'],['Februar','Feb'],['März','Mär'],['April','Apr'],

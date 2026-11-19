@@ -391,3 +391,15 @@
 @media print {
   .workbench-tools, .workspace-divider { display: none !important; }
 }
+
+/* Shared tax year and the evidence status of the selected annual dataset. */
+.workbench-tools { justify-content: space-between; }
+.tax-year-control { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem .8rem; min-width: 0; }
+.tax-year-control label { font-weight: 600; margin: 0; }
+.tax-year-control select { width: auto; max-width: 100%; margin: 0; }
+.tax-year-control small { color: var(--muted); font-size: var(--text-small); }
+.year-notice { margin-bottom: 1rem; padding: 1rem 1.2rem; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: .6rem; background: var(--surface); }
+.year-notice strong { font-size: var(--text-body); }
+.year-notice ul { padding-inline-start: 1.2rem; margin: .5rem 0 0; color: var(--muted); font-size: var(--text-small); line-height: 1.6; }
+.year-notice li + li { margin-top: .35rem; }
+.report-status { padding: 2mm; border: 1px solid #999; }

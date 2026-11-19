@@ -1,7 +1,7 @@
-import { regularLIPayroll } from './payroll.mjs?v=4.23.0';
-import { round, tariff, calculateAT } from './calculator.mjs?v=4.23.0';
-import { TAX } from './tax-data.mjs?v=4.23.0';
-import { swissMonthlyTax } from './swiss.mjs?v=4.23.0';
+import { regularLIPayroll } from './payroll.mjs?v=4.25.0';
+import { round, tariff, calculateAT } from './calculator.mjs?v=4.25.0';
+import { taxForYear } from './tax-data.mjs?v=4.25.0';
+import { swissMonthlyTax } from './swiss.mjs?v=4.25.0';
 
 const sum=values=>round(values.reduce((a,b)=>a+b,0));
 const split=(total,weights)=>{
@@ -40,6 +40,7 @@ function foreignDescriptors(inputs){
   return rows;
 }
 export function foreignPaymentPlan(inputs,li,{swissData}={}){
+  const TAX=taxForYear(inputs.li.year);
   const o=inputs.li,p=li.kind==='ch'?TAX.ch:TAX.li,grossCHF=round(li.regularCHF/12),fullGross=li.grossCHF,descriptors=foreignDescriptors(inputs),weights=descriptors.map(e=>e.grossCHF);
   const annual={...li,availableCHF:li.available/o.fx,salaryGross:round(fullGross*o.fx),subsidy:round(li.gross-round(fullGross*o.fx))};
   delete annual.average;
@@ -61,7 +62,7 @@ export function foreignPaymentPlan(inputs,li,{swissData}={}){
   // Separate ordinary Austrian liability from the tax on special payments and
   // ordinary-tax overflow. The annual assessment and total credit stay intact.
   const ordinaryTaxable=Math.max(0,li.taxable-li.overflow),credits=li.credits;
-  const ordinaryAT=Math.min(li.atTax,round(Math.max(0,tariff(ordinaryTaxable)-credits.family-credits.traffic-credits.avab-li.pp.euro)));
+  const ordinaryAT=Math.min(li.atTax,round(Math.max(0,tariff(ordinaryTaxable,o.year)-credits.family-credits.traffic-credits.avab-li.pp.euro)));
   const ordinaryCredit=round(Math.min(ordinaryAT,li.sourceCredit,round(sourceCHF*o.fx)*12));
   const regularTax=round(ordinaryAT/12),regularCredit=round(ordinaryCredit/12),regularReserve=round(Math.max(0,regularTax-regularCredit));
   const extraAT=round(li.atTax-ordinaryAT),extraCredit=round(Math.min(extraAT,Math.max(0,li.sourceCredit-ordinaryCredit))),extraReserve=round(Math.max(0,extraAT-extraCredit));

@@ -1,4 +1,5 @@
-import { round } from './calculator.mjs?v=4.23.0';
+import { taxForYear } from './tax-data.mjs?v=4.25.0';
+import { round } from './calculator.mjs?v=4.25.0';
 export const CANTONS=Object.freeze({AG:'Aargau',AI:'Appenzell Innerrhoden',AR:'Appenzell Ausserrhoden',BE:'Bern',BL:'Basel-Landschaft',BS:'Basel-Stadt',FR:'Freiburg',GE:'Genf',GL:'Glarus',GR:'Graubünden',JU:'Jura',LU:'Luzern',NE:'Neuenburg',NW:'Nidwalden',OW:'Obwalden',SG:'St. Gallen',SH:'Schaffhausen',SO:'Solothurn',SZ:'Schwyz',TG:'Thurgau',TI:'Tessin',UR:'Uri',VD:'Waadt',VS:'Wallis',ZG:'Zug',ZH:'Zürich'});
 export const ANNUAL_CANTONS=Object.freeze(['FR','GE','TI','VD','VS']);
 export async function decodeSwissTariff(packed){
@@ -22,12 +23,15 @@ export function swissMonthlyTax(income,canton,code,data){
   const [,basisPoints,minimumCents]=rows[lo],rate=basisPoints/10000,minimum=minimumCents/100;
   return {tax:round(Math.max(income*rate,minimum)),rate,minimum,code:actualCode};
 }
-export function swissAnnualSource({annual,bonus,special,payments,canton,tariff,children,church},data){
+export function swissAnnualSource({year=2026,annual,bonus,special,payments,canton,tariff,children,church},data){
   if(!['A','B','C','H'].includes(tariff)||!Number.isInteger(children)||children<0||children>9||tariff==='H'&&children===0)throw new Error('CH-Tarif H benötigt mindestens ein abzugsberechtigtes Kind. Bitte Schweizer Tarifangaben prüfen.');
+  const parameters=taxForYear(year);
+  if(data?.year!==parameters.swissTariffYear)throw new Error('Schweizer Tarifdaten passen nicht zum ausgewählten Steuerjahr.');
+  const status={year:data.year,calculationYear:year,provisional:data.year!==year};
   const code=`${tariff}${children}${church?'Y':'N'}`,gross=annual+bonus;
   if(ANNUAL_CANTONS.includes(canton)){
     const q=swissMonthlyTax(gross/12,canton,code,data);
-    return {...q,tax:round(q.tax*12),model:'annual',periods:[{gross:gross/12,count:12,rate:q.rate}]};
+    return {...q,...status,tax:round(q.tax*12),model:'annual',periods:[{gross:gross/12,count:12,rate:q.rate}]};
   }
   const regular=(annual-special)/12,extras=Math.max(1,Number(payments)-12);
   const normal=swissMonthlyTax(regular,canton,code,data);
@@ -36,5 +40,5 @@ export function swissAnnualSource({annual,bonus,special,payments,canton,tariff,c
     const current=regular+special/extras+(i===extras-1?bonus:0),q=swissMonthlyTax(current,canton,code,data);
     tax+=q.tax;periods.push({gross:current,count:1,rate:q.rate});
   }
-  return {tax:round(tax),rate:gross?tax/gross:0,code:normal.code,model:'monthly',periods};
+  return {...status,tax:round(tax),rate:gross?tax/gross:0,code:normal.code,model:'monthly',periods};
 }

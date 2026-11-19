@@ -1,7 +1,7 @@
-import { defaults, profileFrom, readInputs, calculateScenario, sanitizeProfiles } from './scenario.mjs?v=4.23.0';
-import { buildPaymentPlans, selectedPayment } from './payment-plan.mjs?v=4.23.0';
-import { buildSalaryTimeline, buildAustrianTimeline, PAYDAY_NOTE } from './salary-timeline.mjs?v=4.23.0';
-import { round } from './calculator.mjs?v=4.23.0';
+import { defaults, profileFrom, readInputs, calculateScenario, sanitizeProfiles } from './scenario.mjs?v=4.25.0';
+import { buildPaymentPlans, selectedPayment } from './payment-plan.mjs?v=4.25.0';
+import { buildSalaryTimeline, buildAustrianTimeline, PAYDAY_NOTE } from './salary-timeline.mjs?v=4.25.0';
+import { round } from './calculator.mjs?v=4.25.0';
 
 export const WORK_COUNTRIES=Object.freeze({li:{name:'Liechtenstein',code:'LI',currency:'CHF'},ch:{name:'Schweiz',code:'CH',currency:'CHF'},at:{name:'Österreich',code:'AT',currency:'EUR'}});
 export function comparisonCountries(primary){
